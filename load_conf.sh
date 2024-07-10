@@ -3,7 +3,7 @@ ORIGIN_ROOT=$(realpath $dir/config)
 CONFIG_ROOT=$(realpath ~/.config/atcoder-cli-nodejs)
 
 function def(){
-  cp -s $ORIGIN_ROOT/$1 $CONFIG_ROOT/$1
+  cp $ORIGIN_ROOT/$1 $CONFIG_ROOT/$1
 }
 rm -rf ~/.config/atcoder-cli-nodejs/
 mkdir -p ~/.config/atcoder-cli-nodejs/python
