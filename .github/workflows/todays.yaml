@@ -1,0 +1,23 @@
+name: Merge dev to main
+
+on:
+  schedule:
+    - cron: '30 14 * * *'  # 23:30 JST は 14:30 UTC
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout main branch
+      uses: actions/checkout@v2
+      with:
+        ref: main
+
+    - name: Merge dev into main
+      run: git merge dev
+
+    - name: Push changes to main
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: git push origin main
