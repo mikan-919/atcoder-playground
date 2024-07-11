@@ -1,6 +1,6 @@
 def input_num()->int:
   return int(input())
-def input_nums()->list[str]:
+def input_nums()->list[int]:
   inputs=list(map(int,input().split()))
   return inputs
 

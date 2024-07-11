@@ -10,3 +10,8 @@ def input_strs()->list[str]:
   return input().split()
 
 ### == == == == == Pre Lib == == == == == ###
+
+N=input_num()
+A=input_nums()
+A.sort()
+print(A[-1]-A[0])
