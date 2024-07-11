@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  checkouttest:
+  Workflow_:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -17,6 +17,9 @@ jobs:
       
       - name: ls
         run: ls -a
+
+      - name: branch
+        run: git branch -a
   merge:
     runs-on: ubuntu-latest
     
