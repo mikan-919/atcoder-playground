@@ -19,6 +19,9 @@ jobs:
         ref: main
 
     - name: Merge dev into main
+      run: git pull
+
+    - name: Merge dev into main
       run: git merge dev
 
     - name: Push changes to main
