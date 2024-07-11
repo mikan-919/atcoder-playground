@@ -14,7 +14,8 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v4
-          with: main
+        with: 
+          ref: main
       
       - name: ls
         run: ls -a
