@@ -18,8 +18,14 @@ jobs:
       with:
         ref: main
 
-    - name: Merge dev into main
-      run: git pull
+    - name: Checkout dev branch
+      run: git checkout dev
+    - name: Pull dev branch
+      run: git pull dev
+    
+    - name: Checkout main branch
+      run: git checkout main
+    
 
     - name: Merge dev into main
       run: git merge dev
