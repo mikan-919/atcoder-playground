@@ -3,6 +3,10 @@ name: Merge dev to main
 on:
   schedule:
     - cron: '30 14 * * *'  # 23:30 JST は 14:30 UTC
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
 
 jobs:
   merge:
