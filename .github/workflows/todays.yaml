@@ -14,19 +14,11 @@ jobs:
     
     steps:
     - name: Checkout main branch
-      uses: actions/checkout@v2
-      with:
-        ref: main
+      uses: actions/checkout@v4
 
-    - name: Checkout dev branch
-      run: git checkout dev
-    - name: Pull dev branch
-      run: git pull dev
-    
     - name: Checkout main branch
       run: git checkout main
     
-
     - name: Merge dev into main
       run: git merge dev
 
