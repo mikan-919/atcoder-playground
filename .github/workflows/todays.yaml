@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout main branch
+    - name: Clone Repo
       uses: actions/checkout@v4
       with:
           fetch-depth: 0
@@ -36,6 +36,9 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
+    - name: Checkout dev branch
+      run: git checkout main
+    
     - name: Checkout main branch
       run: git checkout main
     
