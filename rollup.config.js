@@ -3,8 +3,8 @@ import typescript from "@rollup/plugin-typescript";
 export default {
 	input: "src/index.ts",
 	output: {
-		dir: "output",
-		format: "es",
+		file: "output/index.cjs",
+		format: "cjs",
 	},
 	external: ["node:fs"],
 	plugins: [

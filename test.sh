@@ -3,7 +3,7 @@
 # ファイル名の定義
 INPUT_FILE="input.txt"
 EXPECTED_OUTPUT_FILE="output.txt"
-SCRIPT="output/index.js"
+SCRIPT="output/index.cjs"
 
 # 枠の表示関数
 function print_box() {
