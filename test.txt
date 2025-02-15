@@ -1,0 +1,212 @@
+`````
+src/extends/array.ts
+```
+interface Array<T> {
+  transpose(): T[][]
+  zip<U>(other: U[]): [T, U][]
+  sum: () => number
+}
+Array.prototype.transpose = function () {
+  if (this.length === 0) return []
+  return this[0].map((_: unknown, i: number) => this.map((row) => row[i]))
+}
+
+Array.prototype.zip = function <T, U>(this: T[], other: U[]): [T, U][] {
+  const minLength = Math.min(this.length, other.length)
+  const result: [T, U][] = []
+  for (let i = 0; i < minLength; i++) {
+    result.push([this[i], other[i]])
+  }
+  return result
+}
+Array.prototype.sum = function <T extends number>(this: T[]) {
+  if (this.length === 0) return 0
+  if (typeof this[0] !== 'number') return 0
+  return this.reduce((acc, x) => acc + x, 0)
+}
+
+src/extends/string.ts
+```
+interface String {
+  terms<T>(mapper: (value: string, index?: number, array?: string[]) => T): T[]
+  toNumber(): number
+  toArray(): string[]
+}
+
+String.prototype.terms = function <T>(
+  mapper: (value: string, index?: number, array?: string[]) => T,
+): T[] {
+  return this.split(' ').map(mapper)
+}
+String.prototype.toNumber = function () {
+  return Number(this)
+}
+
+String.prototype.toArray = function () {
+  return [...this]
+}
+
+src/stdin.ts
+```
+import { readFileSync } from 'node:fs'
+
+type InputMapping = (((arg: string) => string) | NumberConstructor)[][]
+// type InputMapping = (StringConstructor | NumberConstructor)[][]
+// type InputMapping = (string | number)[][]
+type ConstructorToType<T extends InputMapping> = {
+  [K in keyof T]: T[K] extends infer U
+    ? { [L in keyof U]: U[L] extends NumberConstructor ? number : string }
+    : never
+}
+
+/**
+ * 標準入力全体を読み取る関数
+ * mappingによって文字列と数値に変換します
+ */
+export function inputs<T extends InputMapping>(
+  mapping: T,
+): ConstructorToType<T> {
+  return readFileSync('/dev/stdin', 'utf-8')
+    .split('\n')
+    .filter((e) => e !== '')
+    .map((e, i) =>
+      e.split(' ').map((e, j) => mapping[i][j](e)),
+    ) as ConstructorToType<T>
+}
+/**
+ * 標準入力全体を読み取る関数
+ * 何もマッピングはしません
+ */
+export function input() {
+  return readFileSync('/dev/stdin', 'utf-8').split('\n')
+}
+
+const str = (arg: string) => arg
+const num = Number
+export { str, num }
+
+src/stdout.ts
+```
+export const Yes = (): void => console.log('Yes')
+export const No = (): void => console.log('No')
+export const print = (...args: unknown[]): void => console.log(...args)
+
+export function printArray(
+  array: unknown[],
+  { join }: { join: boolean } = { join: false },
+): void {
+  if (join) print(array.join(''))
+  else print(array.join(' '))
+}
+
+src/extends.ts
+```
+import './extends/string'
+import './extends/array'
+
+src/utils.ts
+```
+type BaseFunc<T extends unknown[], U> = (...args: T) => U
+
+export function memorize<T extends unknown[], U>(
+  fn: BaseFunc<T, U>,
+): BaseFunc<T, U> {
+  const cache = new Map<string, U>()
+
+  // ラップされた関数
+  const wrapped: BaseFunc<T, U> = (...args: T): U => {
+    const key = JSON.stringify(args)
+    if (cache.has(key)) return cache.get(key) as U
+
+    const result = fn(...args)
+    cache.set(key, result)
+    return result
+  }
+
+  return wrapped
+}
+
+src/stdin.beta.ts
+```
+import { readFileSync } from 'node:fs'
+
+export const useStdin = <T>(
+  processInput: (reader: {
+    readLine: () => string
+    readLines: (n: number) => string[]
+    readNumbers: () => number[]
+    readNumberLines: (n: number) => number[][]
+    readMatrix: (rows: number) => number[][]
+  }) => Promise<T>,
+) => {
+  const input = readFileSync('/dev/stdin', 'utf8').split('\n')
+  input.reverse()
+  const readLine = () => {
+    return input.pop() ?? ''
+  }
+
+  const readLines = (n: number) => {
+    return Array(n)
+      .fill(0)
+      .map(() => readLine())
+  }
+
+  const readNumbers = () => {
+    const line = readLine()
+    return line.split(' ').map(Number)
+  }
+  const readNumberLines = (n: number) => {
+    const lines = readLines(n)
+    return lines.map((e) => e.split(' ').map(Number))
+  }
+
+  const readMatrix = (rows: number) => {
+    return Array(rows)
+      .fill(0)
+      .map(() => readNumbers())
+  }
+
+  processInput({
+    readLine,
+    readLines,
+    readNumbers,
+    readMatrix,
+    readNumberLines,
+  })
+}
+
+src/index.ts
+```
+// import { inputs } from "./stdin";
+import { useStdin } from './stdin.beta'
+import { No, print, Yes } from './stdout'
+import './extends'
+
+useStdin(async function main({
+  readNumbers,
+  readLines,
+  readNumberLines,
+  readLine,
+}) {
+  const S = readLine().toArray()
+  let sum = 0
+  S.map((e, i) => {
+    if (e === 'A') {
+      let bIdx = i
+      while (bIdx !== -1) {
+        bIdx = S.indexOf('B', bIdx + 1)
+        if (bIdx === -1) break
+        const cIdx = 2 * bIdx - i
+        if (cIdx >= S.length) {
+          break
+        }
+        if (S[cIdx] === 'C') {
+          sum++
+        }
+      }
+    }
+  })
+  print(sum)
+})
+
+`````
