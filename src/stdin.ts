@@ -1,14 +1,17 @@
 import { readFileSync } from 'node:fs'
 
 const input = readFileSync('/dev/stdin', 'utf8').split('\n')
-export const readLine = () => {
-  return input.shift() ?? ''
-}
 
+let currentLineIndex = 0
+export const readLine = (): string => {
+  const line = input[currentLineIndex]
+  currentLineIndex++
+  return line ?? ''
+}
 export const readLines = (n: number) => {
-  return Array(n)
-    .fill(0)
-    .map(() => readLine())
+  const lines = input.slice(currentLineIndex, currentLineIndex + n)
+  currentLineIndex += n
+  return lines
 }
 
 export const readNumbers = <U extends number = number>() => {
