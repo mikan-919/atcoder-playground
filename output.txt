@@ -1,1 +1,245 @@
-40
+# コードブロックを使用する際の注意点
+コードブロックにコードを出力する際にコード内に解説のためのコメントを含める必要はありません。
+実務の範囲で必要なコメントは記述してよいですが、解説や説明のためにコメントを記述しないで下さい。
+悪い例:
+```typescript
+const float32Array = new Float32Array([1.0, 2.0, 3.0]); // 変換したい配列を使用してください
+const normalArray = Array.from(float32Array); // Float32Arrayから通常の配列（number[]）に変換
+console.log(normalArray); // 出力: [1, 2, 3]
+```
+良い例:
+```typescript
+/**
+ * フィボナッチ数列のn番目の数を計算します。
+ *
+ * @param {number} n 求めたいフィボナッチ数のインデックス（非負の整数）。
+ * @returns {number} n番目のフィボナッチ数。
+ * @throws {Error} nが負の数の場合。
+ */
+function fibonacci(n: number): number {
+  if (n < 0) {
+    throw new Error("入力は非負の整数である必要があります。");
+  }
+  let a = 0;
+  let b = 1;
+  while (n > 0) {
+    [a, b] = [b, a + b];
+    n--;
+  }
+  return a;
+}
+```
+
+# 指示のない暗黙的な設定を以下に記述します
+- フォーマットは
+  - export default function
+  - interface Props type
+  - singleQuote
+  - no semicolons
+  - line width 120
+
+# コードを書く際に注意するべきこと
+If you will run `npm` command, you must use `pnpm` instead `npm`.
+If you will write React component, you must use `export default function ComponentName() {}` and not write `import * as React from 'react'`.
+If you will create component file, you must use CamelCase.
+If you will add style to component, you must use `className` for Tailwind CSS instead `class`.
+If you will use hooks in the component, you must write `'use client'`.
+If you will import components from shadcn/ui, import them from '@/components/ui/'.
+When using TypeScript, always provide explicit type annotations for function parameters and return types.
+Use destructuring for props in functional components.
+Prefer arrow functions for event handlers and callbacks.
+Use the `useState` hook for managing local component state.
+Utilize the `useEffect` hook for side effects and lifecycle management.
+Implement proper error handling and input validation where necessary.
+Follow the existing indentation and formatting style of the surrounding code.
+Use meaningful and descriptive variable and function names.
+Avoid using `any` type in TypeScript; prefer more specific types or interfaces.
+Use async/await for handling asynchronous operations instead of raw promises.
+
+# Workspaceの内容
+`````
+```./src/extends/array.ts
+interface Array<T> {
+  transpose<U extends T>(this: U[][]): T[][]
+  zip<U>(other: U[]): [T, U][]
+  sum(this: number[]): number
+}
+
+Array.prototype.transpose = function <T>(this: T[][]) {
+  if (this.length === 0) return []
+  if (this[0].length === 0) return [[]]
+  return this[0].map((_, i) => this.map((row) => row[i]))
+} as Array<unknown>['transpose']
+
+Array.prototype.zip = function <T, U>(this: T[], other: U[]): [T, U][] {
+  const minLength = Math.min(this.length, other.length)
+  const result: [T, U][] = []
+  for (let i = 0; i < minLength; i++) {
+    result.push([this[i], other[i]])
+  }
+  return result
+} as Array<unknown>['zip']
+
+Array.prototype.sum = function (this: number[]) {
+  if (this.length === 0) return 0
+  return this.reduce((acc, x) => acc + x, 0)
+} as Array<number>['sum']
+```
+
+```./src/extends/string.ts
+interface String {
+  terms<T>(
+    this: string,
+    mapper: (value: string, index?: number, array?: string[]) => T,
+  ): T[] // `this` を string に限定
+  toNumber(this: string): number // `this` を string に限定
+  toArray(this: string): string[] // `this` を string に限定
+}
+
+String.prototype.terms = function <T>(
+  this: string, // `this` を明示的に指定
+  mapper: (value: string, index?: number, array?: string[]) => T,
+): T[] {
+  return this.split(' ').map(mapper)
+} as String['terms']
+
+String.prototype.toNumber = function (this: string) {
+  // `this` を明示的に指定
+  return Number(this)
+} as String['toNumber']
+
+String.prototype.toArray = function (this: string) {
+  // `this` を明示的に指定
+  return [...this]
+} as String['toArray']
+```
+
+```./src/stdout.ts
+export const Yes = (): void => console.log('Yes')
+export const No = (): void => console.log('No')
+export const put = (...args: unknown[]): void => console.log(...args)
+
+export function putArray(array: unknown[], separator = ' '): void {
+  console.log(array.join(separator))
+}
+```
+
+```./src/utils.ts
+type BaseFunc<T extends unknown[], U> = (...args: T) => U
+
+export function memorize<T extends unknown[], U>(
+  fn: BaseFunc<T, U>,
+): BaseFunc<T, U> {
+  const cache = new Map<string, U>()
+
+  // ラップされた関数
+  const wrapped: BaseFunc<T, U> = (...args: T): U => {
+    const key = JSON.stringify(args)
+    if (cache.has(key)) return cache.get(key) as U
+
+    const result = fn(...args)
+    cache.set(key, result)
+    return result
+  }
+
+  return wrapped
+}
+
+/**
+ * 指定範囲の数値配列を生成する関数
+ * @param end 終点 (exclusive)
+ * @param start 始点 (inclusive, default: 0)
+ * @returns 数値配列
+ */
+export function range(end: number, start = 0): number[] {
+  return Array.from({ length: end - start }, (_, i) => start + i)
+}
+
+/**
+ * 最大公約数 (Greatest Common Divisor) を計算する関数
+ * @param a
+ * @param b
+ * @returns 最大公約数
+ */
+export function gcd(a: number, b: number): number {
+  let tempA = a
+  let tempB = b
+  while (tempB) {
+    const remainder = tempA % tempB
+    tempA = tempB
+    tempB = remainder
+  }
+  return tempA
+}
+/**
+ * 最小公倍数 (Least Common Multiple) を計算する関数
+ * @param a
+ * @param b
+ * @returns 最小公倍数
+ */
+export function lcm(a: number, b: number): number {
+  return (a * b) / gcd(a, b)
+}
+```
+
+```./src/index.ts
+import './extends'
+
+import { readLine, readLines, readNumberLines, readNumbers } from './stdin'
+import { put } from './stdout'
+import { range } from './utils'
+
+const [N, M] = readNumbers()
+const AB = readNumberLines(M)
+const sumed = AB.map((ab) => ab.sum() % N)
+const lines = new Map<number, number>()
+
+for (const num of sumed) {
+  const currentCount = lines.get(num) ?? 0
+  lines.set(num, currentCount + 1)
+}
+const defaultSum = Array.from(lines.values()).sum()
+let summer = 0
+for (const i of lines) {
+  summer += i[1] * (defaultSum - i[1])
+}
+put(summer / 2)
+```
+
+```./src/extends.ts
+import './extends/string'
+import './extends/array'
+```
+
+```./src/stdin.ts
+import { readFileSync } from 'node:fs'
+
+const input = readFileSync('/dev/stdin', 'utf8').split('\n')
+export const readLine = () => {
+  return input.shift() ?? ''
+}
+
+export const readLines = (n: number) => {
+  return Array(n)
+    .fill(0)
+    .map(() => readLine())
+}
+
+export const readNumbers = <U extends number = number>() => {
+  const line = readLine()
+  return line.split(' ').map(Number) as U[]
+}
+
+export const readNumberLines = <U extends number = number>(n: number) => {
+  const lines = readLines(n)
+  return lines.map((e) => e.split(' ').map(Number)) as U[][]
+}
+
+export const readMatrix = <U extends number = number>(rows: number) => {
+  return Array(rows)
+    .fill(0)
+    .map(() => readNumbers<U>())
+}
+```
+
+`````
