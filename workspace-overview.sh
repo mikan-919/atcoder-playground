@@ -4,8 +4,7 @@
 echo "\`\`\`\`\`"
 find src/ -type f -print0 | while IFS= read -r -d $'\0' file; do
   # ファイル名を出力
-  echo "$file"
-  echo "\`\`\`"
+  echo "\`\`\`$file"
 
   # ファイルの内容を出力
   cat "$file"

@@ -1,8 +1,6 @@
 type BaseFunc<T extends unknown[], U> = (...args: T) => U
 
-export function memorize<T extends unknown[], U>(
-  fn: BaseFunc<T, U>,
-): BaseFunc<T, U> {
+export function memorize<T extends unknown[], U>(fn: BaseFunc<T, U>): BaseFunc<T, U> {
   const cache = new Map<string, U>()
 
   // ラップされた関数
@@ -44,6 +42,7 @@ export function gcd(a: number, b: number): number {
   }
   return tempA
 }
+
 /**
  * 最小公倍数 (Least Common Multiple) を計算する関数
  * @param a
@@ -53,3 +52,4 @@ export function gcd(a: number, b: number): number {
 export function lcm(a: number, b: number): number {
   return (a * b) / gcd(a, b)
 }
+
