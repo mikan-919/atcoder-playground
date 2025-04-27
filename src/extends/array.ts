@@ -4,6 +4,7 @@ interface Array<T> {
   sum(this: number[]): number
   without(index: number): T[]
   toSet(): Set<T>
+  countOccurrences(): Map<T, number>
 }
 
 Array.prototype.transpose = function <T>(this: T[][]) {
@@ -12,7 +13,7 @@ Array.prototype.transpose = function <T>(this: T[][]) {
   return this[0].map((_, i) => this.map((row) => row[i]))
 }
 
-Array.prototype.zip = function <T, U>(this: T[], other: U[]): [T, U][] {
+Array.prototype.zip = function <T, U>(this: T[], other: U[]) {
   const minLength = Math.min(this.length, other.length)
   const result: [T, U][] = []
   for (let i = 0; i < minLength; i++) {
@@ -35,4 +36,12 @@ Array.prototype.without = function <T>(this: T[], index: number) {
 
 Array.prototype.toSet = function <T>(this: T[]): Set<T> {
   return new Set(this)
+}
+Array.prototype.countOccurrences=function<T>(this:T[]) {
+  const counts = new Map<T, number>()
+  for (const element of this) {
+    // Mapから現在のカウント取得(なければ0)し、+1してセットする短縮形！
+    counts.set(element, (counts.get(element) ?? 0) + 1)
+  }
+  return counts
 }
