@@ -1,7 +1,7 @@
 interface Array<T> {
   transpose<U extends T>(this: U[][]): T[][]
   zip<U>(other: U[]): [T, U][]
-  sum(this: number[]): number
+  sum(this: number[] | bigint[]): number | bigint
   without(index: number): T[]
   toSet(): Set<T>
   countOccurrences(): Map<T, number>
@@ -22,9 +22,12 @@ Array.prototype.zip = function <T, U>(this: T[], other: U[]) {
   return result
 }
 
-Array.prototype.sum = function (this: number[]) {
+Array.prototype.sum = function (this: number[] | bigint[]) {
   if (this.length === 0) return 0
-  return this.reduce((acc, x) => acc + x, 0)
+  if (typeof this[0] === 'bigint') {
+    return (this as bigint[]).reduce((acc, x) => acc + x, 0n)
+  }
+  return (this as number[]).reduce((acc, x) => acc + x, 0)
 }
 
 Array.prototype.without = function <T>(this: T[], index: number) {
@@ -37,11 +40,12 @@ Array.prototype.without = function <T>(this: T[], index: number) {
 Array.prototype.toSet = function <T>(this: T[]): Set<T> {
   return new Set(this)
 }
-Array.prototype.countOccurrences=function<T>(this:T[]) {
+Array.prototype.countOccurrences = function <T>(this: T[]) {
   const counts = new Map<T, number>()
+
   for (const element of this) {
-    // Mapから現在のカウント取得(なければ0)し、+1してセットする短縮形！
     counts.set(element, (counts.get(element) ?? 0) + 1)
   }
+
   return counts
 }
