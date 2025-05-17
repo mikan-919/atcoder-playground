@@ -5,5 +5,11 @@ import { no, put, stop, yes } from './stdout'
 import { edgeListToAdjacencyList } from './utils/graph'
 import { range } from './utils/utils'
 
-// const [N] = readNumbers()
-// const [A,B] = readNumbers()
+const [N, K] = readNumbers()
+const A = readNumbers()
+let counter = 1
+for (const ai of A) {
+  counter *= ai
+  if (counter.toString().length>=K+1) counter = 1
+}
+put(counter)
