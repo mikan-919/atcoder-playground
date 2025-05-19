@@ -19,6 +19,15 @@ export const readNumbers = <U extends number = number>() => {
   return line.split(' ').map(Number) as U[]
 }
 
+export const readBigInts = (): bigint[] => {
+  const line = readLine()
+  if (line.trim() === '') return []
+  return line
+    .split(' ')
+    .filter((s) => s !== '')
+    .map(BigInt)
+}
+
 export const readNumberLines = <U extends number = number>(n: number) => {
   const lines = readLines(n)
   return lines.map((e) => e.split(' ').map(Number)) as U[][]
