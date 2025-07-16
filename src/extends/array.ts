@@ -5,6 +5,7 @@ interface Array<T> {
   without(index: number): T[]
   toSet(): Set<T>
   countOccurrences(): Map<T, number>
+  toDifferences<U>(this: number[], evaluator: (currentElement: T, nextElement: T) => U): U[]
 }
 
 Array.prototype.transpose = function <T>(this: T[][]) {
@@ -48,4 +49,17 @@ Array.prototype.countOccurrences = function <T>(this: T[]) {
   }
 
   return counts
+}
+
+Array.prototype.toDifferences = function <T, U>(this: T[], evaluator: (arg0: T, arg1: T) => U): U[] {
+  const ev = evaluator ?? ((a: number, b: number) => a - b)
+  if (this.length < 2) {
+    return []
+  }
+
+  const results: U[] = []
+  for (let i = 0; i < this.length - 1; i++) {
+    results.push(ev(this[i], this[i + 1]))
+  }
+  return results
 }

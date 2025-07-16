@@ -8,6 +8,9 @@
     "indentStyle": "space",
     "lineWidth": 120
   },
+  "organizeImports": {
+    "enabled": true
+  },
   "javascript": {
     "formatter": {
       "indentStyle": "space",
