@@ -1,11 +1,14 @@
 interface Array<T> {
   transpose<U extends T>(this: U[][]): T[][]
   zip<U>(other: U[]): [T, U][]
-  sum(this: number[] | bigint[]): number | bigint
   without(index: number): T[]
   toSet(): Set<T>
   countOccurrences(): Map<T, number>
   toDifferences<U>(this: number[], evaluator: (currentElement: T, nextElement: T) => U): U[]
+}
+
+interface Array<T extends number | bigint> {
+  sum(): T
 }
 
 Array.prototype.transpose = function <T>(this: T[][]) {
