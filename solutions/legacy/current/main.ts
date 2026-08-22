@@ -1,9 +1,7 @@
-import './extends'
-import { Deque, Matrix } from 'data-structure-typed'
-import { readLines, readNumberLines, readNumbers } from './stdin'
-import { put, stop } from './stdout'
-import { range } from './utils/utils'
-const INF = Number.POSITIVE_INFINITY
+import '../../../src/extends'
+import { readNumberLines, readNumbers } from '../../../src/stdin'
+import { put } from '../../../src/stdout'
+import { range } from '../../../src/utils/utils'
 
 const [T] = readNumbers()
 const cases = []

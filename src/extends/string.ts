@@ -1,13 +1,17 @@
 type RunLengthTuple = [char: string, count: number]
 
 interface String {
-  terms<T>(this: string, mapper?: (value: string, index?: number, array?: string[]) => T): T[]
+  terms(this: string): string[]
+  terms<T>(this: string, mapper: (value: string, index: number, array: string[]) => T): T[]
   toNumber(this: string): number
   toArray(this: string): string[]
   toRunLength(): RunLengthTuple[]
 }
 
-String.prototype.terms = function <T>(this: string, mapper?: (value: string, index?: number, array?: string[]) => T) {
+String.prototype.terms = function <T>(
+  this: string,
+  mapper?: (value: string, index: number, array: string[]) => T,
+): string[] | T[] {
   if (mapper) return this.split(' ').map(mapper)
   return this.split(' ')
 }

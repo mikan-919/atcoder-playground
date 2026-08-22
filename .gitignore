@@ -1,5 +1,11 @@
-node_modules
-output
+node_modules/
+.direnv/
+dist/
+test/
+solutions/**/test/
+.current-problem
 input.txt
 output.txt
 test.txt
+.DS_Store
+__pycache__/

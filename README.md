@@ -1,0 +1,92 @@
+# AtCoder Playground
+
+TypeScriptで解き、問題ごとのコードを保存しながら、AtCoderのNode.js環境向け`dist/Main.js`を生成するワークスペースです。
+
+## 初回セットアップ
+
+```bash
+direnv allow
+bun install
+bun run login
+```
+
+`.envrc`が`use flake`を実行するため、以後はこのディレクトリへ入るだけで、現在のシェルを維持したままBun、Node.js 22、`online-judge-tools`（`oj`）、Biome、esbuildが利用できます。依存バージョンは`flake.lock`で固定されます。手動でサブシェルへ入る場合は`nix develop`も利用できます。
+
+### AtCoderへのログイン
+
+AtCoderではCloudflare Turnstileが使われているため、`oj login`へユーザー名とパスワードを入力する方式は利用できません。
+
+1. ブラウザで[AtCoder](https://atcoder.jp/login)へログインする
+2. 開発者ツールのApplication（FirefoxではStorage）→ Cookies → `https://atcoder.jp`を開く
+3. `REVEL_SESSION`の値をコピーする
+4. `bun run login`を実行し、非表示の入力欄へ貼り付ける
+
+値は`~/.local/share/online-judge-tools/cookie.jar`へ権限`0600`で保存されます。秘密情報なので共有・コミットしないでください。
+
+## 普段の流れ
+
+短い問題IDで解答ファイルを作り、サンプルを取得します。
+
+```bash
+bun run new -- abc472/a
+```
+
+`solutions/abc472/a/main.ts`を編集します。サンプルの実行と提出では、直前に選択した問題を省略できます。
+
+```bash
+bun run test
+bun run submit
+```
+
+保存するたびにサンプルテストを自動実行したい場合は、`dev`を起動したままにします。解答ファイルと`src/`の共通ライブラリが監視対象です。
+
+```bash
+bun run dev -- abc472/a
+```
+
+問題がまだ作成されていない場合は、テンプレートのコピーとサンプル取得も自動で行います。停止は`Ctrl-C`です。
+
+手入力で試す場合は次を実行し、標準入力を貼り付けます。
+
+```bash
+bun run run
+```
+
+問題を明示する場合は、短縮形とURLのどちらも利用できます。
+
+```bash
+bun run test -- abc472/a
+bun run submit -- abc472/a
+bun run submit -- https://atcoder.jp/contests/abc472/tasks/abc472_a
+```
+
+## ディレクトリ構成
+
+```text
+src/                         共通ライブラリ
+template/main.ts             新しい解答のテンプレート
+solutions/<contest>/<task>/
+  main.ts                    問題ごとの解答（Gitで保存）
+  test/                      ダウンロードしたサンプル（Git対象外）
+dist/Main.js                 bundle済み提出ファイル（Git対象外）
+```
+
+共通処理は`src/`へ追加し、解答から相対importします。`new`は既存の`main.ts`を上書きしないため、同じ問題を再度指定しても解答は保持されます。以前の`src/index.ts`は`solutions/legacy/current/main.ts`へ移動済みです。
+
+## コマンド
+
+| コマンド | 内容 |
+| --- | --- |
+| `bun run new -- abc472/a` | 解答を作成し、サンプルを取得して選択 |
+| `bun run download -- abc472/a` | 解答を用意し、サンプルを再取得 |
+| `bun run dev -- abc472/a` | 問題をロードし、保存ごとにサンプルテスト |
+| `bun run check` | 全ライブラリ・保存済み解答の型検査とlint |
+| `bun run fmt` | format、import整理、lintの安全な修正 |
+| `bun run login` | ブラウザのAtCoderセッションを`oj`へ登録 |
+| `bun run build -- [問題]` | 選択した問題から`dist/Main.js`を生成 |
+| `bun run test -- [問題]` | build後、その問題の全サンプルを検証 |
+| `bun run run -- [問題]` | build後、標準入力で実行 |
+| `bun run submit -- [問題]` | check/build後、`oj`で提出 |
+| `bun run watch -- [問題]` | 選択した問題を継続build |
+
+外部パッケージもesbuildが提出ファイルへbundleします。ただしソースサイズと実行時間を考え、必要なものだけをimportしてください。

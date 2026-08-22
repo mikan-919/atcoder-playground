@@ -1,23 +1,31 @@
 {
   "name": "atcoder-playground",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "TypeScript workspace for AtCoder",
+  "private": true,
   "scripts": {
-    "fmt": "pnpx @biomejs/biome format --write src/*",
-    "build": "esbuild src/index.ts --bundle --outfile=output/index.cjs --platform=node --target=es2024 --tree-shaking=true --ignore-annotations  --keep-names && ./comment.sh",
-    "dev": "esbuild src/index.ts --bundle --outfile=output/index.cjs --platform=node -w"
+    "build": "node scripts/atcoder.mjs build",
+    "check": "tsc --noEmit && biome-nix lint src scripts template solutions",
+    "dev": "node scripts/atcoder.mjs dev",
+    "download": "node scripts/atcoder.mjs download",
+    "fmt": "biome-nix check --write src scripts template solutions",
+    "login": "python3 scripts/login-atcoder.py",
+    "new": "node scripts/atcoder.mjs new",
+    "run": "node scripts/atcoder.mjs run",
+    "submit": "bun run check && node scripts/atcoder.mjs submit",
+    "test": "bun run check && node scripts/atcoder.mjs test",
+    "watch": "node scripts/atcoder.mjs watch"
   },
   "type": "module",
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@9.13.2+sha512.88c9c3864450350e65a33587ab801acf946d7c814ed1134da4a924f6df5a2120fd36b46aab68f7cd1d413149112d53c7db3a4136624cfd00ff1846a0c6cef48a",
+  "packageManager": "bun@1.2.21",
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "@types/node": "^22.9.0",
+    "@types/node": "^22.18.1",
     "esbuild": "^0.25.2",
-    "typescript": "^5.6.3"
+    "typescript": "^5.9.2"
   },
   "dependencies": {
     "data-structure-typed": "^2.1.0"
