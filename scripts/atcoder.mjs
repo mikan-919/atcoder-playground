@@ -69,7 +69,7 @@ function build(problem, watch = false) {
     console.error(`${source} がありません。先に bun run new -- ${problem.contest}/${problem.task} を実行してください。`)
     process.exit(2)
   }
-  const args = [source, '--bundle', `--outfile=${output}`, '--platform=node', '--format=cjs', '--target=node22', '--tree-shaking=true']
+  const args = [source, '--bundle', `--outfile=${output}`, '--platform=node', '--format=esm', '--target=node22', '--tree-shaking=true']
   if (watch) args.push('--watch')
   run('esbuild-nix', args)
 }

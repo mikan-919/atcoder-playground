@@ -10,7 +10,9 @@ bun install
 bun run login
 ```
 
-`.envrc`が`use flake`を実行するため、以後はこのディレクトリへ入るだけで、現在のシェルを維持したままBun、Node.js 22、`online-judge-tools`（`oj`）、Biome、esbuildが利用できます。依存バージョンは`flake.lock`で固定されます。手動でサブシェルへ入る場合は`nix develop`も利用できます。
+`.envrc`が`use flake`を実行するため、以後はこのディレクトリへ入るだけで、現在のシェルを維持したままBun、Node.js 22、`online-judge-tools`（`oj`）、Biome、esbuildが利用できます。依存バージョンは`flake.lock`で固定されます。手動で`nix develop`を実行した場合はZshが起動します。
+
+Zedでは`.zed/settings.json`によりdirenv環境のNixネイティブBiomeを使用し、このプロジェクトで使っていないESLintを無効化します。設定変更後に開いていた場合は、Zedで`language server: restart all language servers`を実行してください。
 
 ### AtCoderへのログイン
 

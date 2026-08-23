@@ -26,12 +26,18 @@
               nodejs_22
               python3Packages.online-judge-tools
               watchexec
+              zsh
+              biome
+              vtsls
               biomeForProject
               esbuildForProject
             ];
 
             shellHook = ''
               echo "AtCoder environment: Bun $(bun --version), Node.js $(node --version), oj $(oj --version)"
+              if [[ $- == *i* ]] && [[ -z "''${ZSH_VERSION:-}" ]]; then
+                exec zsh -i
+              fi
             '';
           };
         });

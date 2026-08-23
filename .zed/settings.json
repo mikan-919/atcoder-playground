@@ -1,0 +1,23 @@
+{
+  "load_direnv": "direct",
+  "auto_install_extensions": {
+    "biome": true
+  },
+  "languages": {
+    "JavaScript": {
+      "language_servers": ["vtsls", "biome", "!eslint", "..."],
+      "formatter": { "language_server": { "name": "biome" } },
+      "format_on_save": "on"
+    },
+    "TypeScript": {
+      "language_servers": ["vtsls", "biome", "!eslint", "..."],
+      "formatter": { "language_server": { "name": "biome" } },
+      "format_on_save": "on"
+    },
+    "TSX": {
+      "language_servers": ["vtsls", "biome", "!eslint", "..."],
+      "formatter": { "language_server": { "name": "biome" } },
+      "format_on_save": "on"
+    }
+  }
+}
