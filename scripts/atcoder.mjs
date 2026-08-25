@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { handoffSubmit } from './handoff.mjs'
 
 const [, , command, argument] = process.argv
 const output = 'dist/Main.js'
@@ -154,8 +155,10 @@ switch (command) {
     const problem = problemFromArgument()
     select(problem)
     build(problem)
-    // oj submit は AtCoder のページ変更で壊れているため、提出フォームを直接叩くヘルパーを使う
-    run('python3', ['scripts/submit-atcoder.py', problem.url, output])
+    const { url, copied, opened } = handoffSubmit(problem.url, output)
+    console.log(copied ? `${output} をクリップボードにコピーしました。` : 'クリップボードにコピーできませんでした。')
+    console.log(opened ? `提出ページを開きました: ${url}` : `提出ページ: ${url}`)
+    console.log('貼り付けて提出してください（AtCoderの提出はCloudflare Turnstileで保護されています）。')
     break
   }
   case 'watch': {

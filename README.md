@@ -43,7 +43,7 @@ abc329  3/4 AC  (+2問は画面外)
 │✓ sample-2  31ms    │ │                    │ │                    │ │                    │
 ╰────────────────────╯ ╰────────────────────╯ ╰────────────────────╯ ╰────────────────────╯
 
-abcdefg: 選択   s: 提出   r: 全再実行   q: 終了
+abcdefg: 選択   s: コピーして提出ページへ   r: 全再実行   q: 終了
 ```
 
 `solutions/abc329/<問題>/main.ts`か`src/`を保存すると、その問題だけ自動で再ビルド・再テストされます。落ちたサンプルは期待と出力がそのペインに並びます。
@@ -51,11 +51,11 @@ abcdefg: 選択   s: 提出   r: 全再実行   q: 終了
 | キー | 動作 |
 | --- | --- |
 | `a`〜`g`、`←` `→` | ペインを選択 |
-| `s` | 選択中の問題を提出（`y`で実行、`n`で中止） |
+| `s` | 選択中の問題のコードをコピーし、提出ページをブラウザで開く |
 | `r` | 全問を再テスト |
 | `q` | 終了 |
 
-提出言語は既定で`JavaScript (Bun)`です。変えたい場合は`ATCODER_LANGUAGE`に言語名の一部（`Node.js`など）か言語IDを設定してください。画面幅が足りないときはペインが1問22桁まで詰められ、入りきらない問題は選択に応じてスクロールします。
+提出はブラウザへ受け渡します（下の「提出について」を参照）。画面幅が足りないときはペインが1問22桁まで詰められ、入りきらない問題は選択に応じてスクロールします。
 
 1問だけ扱う場合は、短い問題IDで解答ファイルを作り、サンプルを取得します。
 
@@ -107,13 +107,11 @@ dist/Main.js                 bundle済み提出ファイル（Git対象外）
 
 ### 提出について
 
-`oj submit`はAtCoderのページ変更（`Memory Limit: 1024 MiB` — ojは`MB`/`KB`しか解釈できない）で、提出前にAssertionErrorで落ちます。`bun run submit`と`contest`のTUIは、代わりに`scripts/submit-atcoder.py`が提出フォームを直接POSTします。cookieは`oj`と同じ`~/.local/share/online-judge-tools/cookie.jar`を読みます。
+AtCoderの提出フォームはCloudflare Turnstileで保護されているため、スクリプトからPOSTしても`Error.`で弾かれます（`oj submit`も同様に失敗します。ojはさらに、問題ページの`Memory Limit: 1024 MiB`を解釈できず提出前にAssertionErrorで落ちます）。
 
-提出せずに言語の解決だけ確認できます。
+そこで`bun run submit`と`contest`の`s`キーは、**バンドル済みのコードをクリップボードへコピーし、その問題の提出ページをブラウザで開く**ところまでを行います。あとは貼り付けて提出してください。言語はブラウザが前回の選択（`JavaScript (Bun 1.2.21)`）を憶えています。
 
-```bash
-python3 scripts/submit-atcoder.py https://atcoder.jp/contests/abc472/tasks/abc472_a dist/Main.js --dry-run
-```
+クリップボードは`clip.exe`（WSL）、`wl-copy`、`xclip`、`xsel`、`pbcopy`の順に、ブラウザは`wslview`、`explorer.exe`、`xdg-open`、`open`の順に、使えるものを探します。
 
 
 ## コマンド

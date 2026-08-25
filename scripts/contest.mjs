@@ -11,6 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { join } from 'node:path'
+import { handoffSubmit } from './handoff.mjs'
 
 const contest = process.argv[2]
 if (!/^[a-z0-9_-]+$/.test(contest ?? '')) {
@@ -146,7 +147,6 @@ async function setup() {
       samples: loadSamples(testsDir),
       status: readFileSync(source, 'utf8') === template ? 'blank' : 'pending',
       body: [],
-      submitting: false,
     })
   }
   return problems
@@ -201,7 +201,6 @@ const excerpt = (text, label, color, limit = 3) => {
 const running = new Map()
 
 async function check(problem) {
-  if (problem.submitting) return
   if (readFileSync(problem.source, 'utf8') === template) {
     problem.status = 'blank'
     problem.body = [line('未着手', 2)]
@@ -278,22 +277,14 @@ async function check(problem) {
 
 // ---------- 提出 ----------
 
-async function submit(problem) {
-  problem.submitting = true
-  problem.body = [line('提出中...', 33)]
-  render()
-  // oj submit は AtCoder のページ変更で壊れているため、提出フォームを直接叩くヘルパーを使う
-  const args = ['scripts/submit-atcoder.py', problem.url, problem.bundle]
-  const log = []
-  const { status } = await exec('python3', args, (row) => {
-    const text = row.replace(/^\w+:[\w.]+:/, '').trim()
-    if (text) log.push(line(text, /error/i.test(text) ? 31 : 0))
-    problem.body = log.slice(-40)
-    render()
-  })
-  if (status !== 0) log.push(line(`提出に失敗しました (exit ${status})`, 31))
-  problem.body = log.slice(-40)
-  problem.submitting = false
+function submit(problem) {
+  const { url, copied, opened } = handoffSubmit(problem.url, problem.bundle)
+  problem.body = [
+    line(copied ? `${copied} でコピーしました` : 'クリップボードにコピーできませんでした', copied ? 32 : 31),
+    line(opened ? 'ブラウザで提出ページを開きました' : '提出ページを開けませんでした', opened ? 32 : 31),
+    line(url, 2),
+    line('貼り付けて提出してください', 2),
+  ]
   render()
 }
 
@@ -301,7 +292,6 @@ async function submit(problem) {
 
 let problems = []
 let selected = 0
-let confirming = false
 let renderQueued = false
 
 const render = () => {
@@ -353,16 +343,10 @@ function draw() {
   }
   out.push(cap('╰╯', false))
 
-  const current = problems[selected]
   out.push('')
-  if (confirming && current) {
-    const warn = current.status === 'AC' ? 32 : 31
-    out.push(
-      `${paint(warn, `${current.letter} (${current.status})`)} を提出しますか?  ${paint(1, 'y')} で提出 / ${paint(1, 'n')} で中止  ${paint(2, current.url)}`,
-    )
-  } else {
-    out.push(paint(2, `${problems.map((p) => p.letter).join('')}: 選択   s: 提出   r: 全再実行   q: 終了`))
-  }
+  out.push(
+    paint(2, `${problems.map((p) => p.letter).join('')}: 選択   s: コピーして提出ページへ   r: 全再実行   q: 終了`),
+  )
 
   process.stdout.write(`\x1b[H${out.map((row) => `${row}\x1b[K`).join('\n')}\n\x1b[J`)
 }
@@ -410,18 +394,13 @@ if (process.stdin.isTTY) {
   process.stdin.resume()
   process.stdin.setEncoding('utf8')
   process.stdin.on('data', (key) => {
-    if (confirming) {
-      confirming = false
-      if (key === 'y') submit(problems[selected])
-      return render()
-    }
     if (key === 'q' || key === '\x03') process.exit(0)
     if (key === 'r') return checkAll()
     if (key === 's') {
       const target = problems[selected]
-      // 未着手・ビルド失敗・テスト実行中は、bundle が無い/古いので提出させない
-      confirming = Boolean(target) && existsSync(target.bundle) && !running.has(target.letter)
-      return render()
+      // 未着手・ビルド失敗・テスト実行中は bundle が無い/古いので渡さない
+      if (target && existsSync(target.bundle) && !running.has(target.letter)) submit(target)
+      return
     }
     if (key === '\x1b[C' || key === '\x1b[B') selected = Math.min(selected + 1, problems.length - 1)
     else if (key === '\x1b[D' || key === '\x1b[A') selected = Math.max(selected - 1, 0)
