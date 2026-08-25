@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 
 // AtCoderの提出フォームはCloudflare Turnstileで保護されており、
 // スクリプトからのPOSTは受け付けられない。コードをクリップボードへ入れて
@@ -12,7 +12,21 @@ const CLIPBOARD = [
   ['xsel', '--clipboard', '--input'],
   ['pbcopy'],
 ]
-const OPENER = [['wslview'], ['explorer.exe'], ['xdg-open'], ['open']]
+// WSLではカレントディレクトリがUNCパスになり、Windows実行ファイルが引数を処理する前に
+// 「フォルダを開く」動作へフォールバックする。/mnt/c から起動して回避する。
+const WINDOWS_CWD = existsSync('/mnt/c') ? '/mnt/c' : undefined
+const escapeForPowerShell = (url) => url.replace(/'/g, "''")
+
+const OPENER = [
+  (url) => ['wslview', [url]],
+  (url) => [
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-Command', `Start-Process '${escapeForPowerShell(url)}'`],
+  ],
+  (url) => ['explorer.exe', [url]],
+  (url) => ['xdg-open', [url]],
+  (url) => ['open', [url]],
+]
 
 export function copyToClipboard(text) {
   for (const [program, ...args] of CLIPBOARD) {
@@ -23,9 +37,11 @@ export function copyToClipboard(text) {
 }
 
 export function openUrl(url) {
-  for (const [program, ...args] of OPENER) {
+  for (const build of OPENER) {
+    const [program, args] = build(url)
+    const isWindows = program.endsWith('.exe')
     // explorer.exe は成功しても終了コード1を返すため、起動できたかどうかだけ見る
-    const result = spawnSync(program, [...args, url], { stdio: 'ignore' })
+    const result = spawnSync(program, args, { stdio: 'ignore', cwd: isWindows ? WINDOWS_CWD : undefined })
     if (!result.error) return program
   }
   return null
