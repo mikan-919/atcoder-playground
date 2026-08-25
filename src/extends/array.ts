@@ -32,6 +32,31 @@ interface Array<T> {
   without(index: number): T[]
 
   /**
+   * 重複を取り除いた新しい配列を返します。
+   * 最初に現れた順序を保ちます。
+   *
+   * @example
+   * ```ts
+   * [3, 1, 3, 2].unique() // [3, 1, 2]
+   * ```
+   */
+  unique(): T[]
+
+  /**
+   * 数値として昇順に並べた新しい配列を返します。
+   * 比較関数なしの`sort()`は文字列比較になるため、数値配列ではこちらを使います。
+   * `descending`にtrueを渡すと降順になります。
+   *
+   * @example
+   * ```ts
+   * [100, 99].sort() // [100, 99]（文字列比較）
+   * [100, 99].sortNumbers() // [99, 100]
+   * [1, 3, 2].sortNumbers(true) // [3, 2, 1]
+   * ```
+   */
+  sortNumbers<U extends number | bigint>(this: U[], descending?: boolean): U[]
+
+  /**
    * 配列の要素から新しいSetを作ります。
    *
    * @example
@@ -175,6 +200,21 @@ Object.defineProperties(Array.prototype, {
     value: function <T>(this: T[], index: number): T[] {
       if (index < 0 || index >= this.length) return this.slice()
       return this.slice(0, index).concat(this.slice(index + 1))
+    },
+    writable: true,
+    configurable: true,
+  },
+  unique: {
+    value: function <T>(this: T[]): T[] {
+      return [...new Set(this)]
+    },
+    writable: true,
+    configurable: true,
+  },
+  sortNumbers: {
+    value: function <T extends number | bigint>(this: T[], descending = false): T[] {
+      const sign = descending ? -1 : 1
+      return this.slice().sort((a, b) => (a < b ? -sign : a > b ? sign : 0))
     },
     writable: true,
     configurable: true,
