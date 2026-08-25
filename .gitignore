@@ -9,3 +9,6 @@ output.txt
 test.txt
 .DS_Store
 __pycache__/
+
+# コンテスト単位の問題一覧キャッシュ
+solutions/**/.tasks.json

@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "build": "node scripts/atcoder.mjs build",
+    "contest": "node scripts/contest.mjs",
     "check": "tsc --noEmit && biome-nix lint src scripts template solutions",
     "dev": "node scripts/atcoder.mjs dev",
     "download": "node scripts/atcoder.mjs download",
