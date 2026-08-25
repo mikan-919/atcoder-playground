@@ -141,7 +141,7 @@ switch (command) {
       process.exit(2)
     }
     build(problem)
-    run('oj', ['test', '--command', `node ${output}`, '--directory', tests])
+    run('oj', ['test', '--command', `node ${output}`, '--directory', tests, '--display-mode', 'diff'])
     break
   }
   case 'run': {
