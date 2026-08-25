@@ -21,23 +21,51 @@ if (!/^[a-z0-9_-]+$/.test(contest ?? '')) {
 const contestDir = join('solutions', contest)
 const taskCache = join(contestDir, '.tasks.json')
 const template = readFileSync('template/main.ts', 'utf8')
+const MIN_PANE = 22
+const TIMEOUT_MS = 4000
 
-const paint = (code, text) => `\x1b[${code}m${text}\x1b[0m`
-const dim = (t) => paint(2, t)
-const bold = (t) => paint(1, t)
+// ---------- 表示ユーティリティ ----------
 
-const STATUS = {
-  blank: { mark: '·', color: 2, label: '--' },
-  pending: { mark: '·', color: 2, label: '...' },
-  running: { mark: '◌', color: 33, label: 'RUN' },
-  AC: { mark: '✓', color: 32, label: 'AC' },
-  WA: { mark: '✗', color: 31, label: 'WA' },
-  RE: { mark: '!', color: 35, label: 'RE' },
-  TLE: { mark: '⏱', color: 33, label: 'TLE' },
-  CE: { mark: '!', color: 35, label: 'CE' },
+const paint = (code, text) => (code === 0 ? text : `\x1b[${code}m${text}\x1b[0m`)
+const wide = /[ᄀ-ᅟ⺀-꓏가-힣豈-﫿︰-﹯＀-｠￠-￦]/
+const widthOf = (text) => [...text].reduce((total, char) => total + (wide.test(char) ? 2 : 1), 0)
+
+function fit(text, width) {
+  let out = ''
+  let used = 0
+  for (const char of text) {
+    const size = wide.test(char) ? 2 : 1
+    if (used + size > width) return `${out}…`.padEnd(width - used + out.length + 1)
+    out += char
+    used += size
+  }
+  return out + ' '.repeat(width - used)
 }
 
-// ---------- セットアップ（TUI に入る前に普通のログを出す） ----------
+const line = (text, color = 0) => ({ text, color })
+
+const VERDICT = {
+  pending: { mark: '·', color: 2 },
+  running: { mark: '◌', color: 33 },
+  AC: { mark: '✓', color: 32 },
+  WA: { mark: '✗', color: 31 },
+  RE: { mark: '!', color: 35 },
+  TLE: { mark: '⏱', color: 33 },
+}
+const STATUS_COLOR = { blank: 2, pending: 2, building: 33, running: 33, AC: 32, WA: 31, RE: 35, TLE: 33, CE: 35 }
+const STATUS_LABEL = {
+  blank: '--',
+  pending: '...',
+  building: 'BUILD',
+  running: 'RUN',
+  AC: 'AC',
+  WA: 'WA',
+  RE: 'RE',
+  TLE: 'TLE',
+  CE: 'CE',
+}
+
+// ---------- セットアップ ----------
 
 async function fetchTaskIds() {
   if (existsSync(taskCache)) return JSON.parse(readFileSync(taskCache, 'utf8'))
@@ -53,19 +81,26 @@ async function fetchTaskIds() {
   return ids
 }
 
-const exec = (program, args, options = {}) =>
+const exec = (program, args, onLine) =>
   new Promise((resolve) => {
-    const child = spawn(program, args, { stdio: ['ignore', 'pipe', 'pipe'], ...options })
-    let stdout = ''
-    let stderr = ''
-    child.stdout?.on('data', (chunk) => {
-      stdout += chunk
+    const child = spawn(program, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    let rest = ''
+    let tail = ''
+    const consume = (chunk) => {
+      tail += chunk
+      if (!onLine) return
+      rest += chunk
+      const parts = rest.split('\n')
+      rest = parts.pop() ?? ''
+      for (const part of parts) onLine(part)
+    }
+    child.stdout.on('data', consume)
+    child.stderr.on('data', consume)
+    child.on('error', (error) => resolve({ status: 127, output: error.message }))
+    child.on('close', (status) => {
+      if (rest && onLine) onLine(rest)
+      resolve({ status, output: tail })
     })
-    child.stderr?.on('data', (chunk) => {
-      stderr += chunk
-    })
-    child.on('error', (error) => resolve({ status: 127, stdout, stderr: error.message }))
-    child.on('close', (status) => resolve({ status, stdout, stderr }))
   })
 
 function loadSamples(testsDir) {
@@ -75,12 +110,12 @@ function loadSamples(testsDir) {
     .sort()
     .map((file) => {
       const name = file.slice(0, -3)
-      const expectedPath = join(testsDir, `${name}.out`)
+      const expected = join(testsDir, `${name}.out`)
       return {
         name: name.replace(/^sample-/, ''),
         inputPath: join(testsDir, file),
         input: readFileSync(join(testsDir, file), 'utf8'),
-        expected: existsSync(expectedPath) ? readFileSync(expectedPath, 'utf8') : null,
+        expected: existsSync(expected) ? readFileSync(expected, 'utf8') : null,
       }
     })
 }
@@ -100,45 +135,30 @@ async function setup() {
     if (!existsSync(testsDir) || !readdirSync(testsDir).some((file) => file.endsWith('.in'))) {
       process.stdout.write(`${letter}: サンプル取得中...`)
       const url = `https://atcoder.jp/contests/${contest}/tasks/${id}`
-      const { status, stderr } = await exec('oj', ['download', url, '--directory', testsDir, '--silent'])
-      process.stdout.write(status === 0 ? ' ok\n' : ` 失敗 (${stderr.trim().split('\n').pop() ?? status})\n`)
+      const { status, output } = await exec('oj', ['download', url, '--directory', testsDir, '--silent'])
+      process.stdout.write(status === 0 ? ' ok\n' : ` 失敗 (${output.trim().split('\n').pop() ?? status})\n`)
     }
     problems.push({
       letter,
-      id,
+      url: `https://atcoder.jp/contests/${contest}/tasks/${id}`,
       source,
-      testsDir,
       bundle: join('dist', contest, `${letter}.js`),
       samples: loadSamples(testsDir),
       status: readFileSync(source, 'utf8') === template ? 'blank' : 'pending',
-      results: new Map(),
-      detail: null,
+      body: [],
+      submitting: false,
     })
   }
   return problems
 }
 
-// ---------- ビルドと実行 ----------
-
-async function buildProblem(problem) {
-  const { status, stderr } = await exec('esbuild-nix', [
-    problem.source,
-    '--bundle',
-    `--outfile=${problem.bundle}`,
-    '--platform=node',
-    '--format=esm',
-    '--target=node22',
-    '--tree-shaking=true',
-    '--log-level=error',
-  ])
-  return status === 0 ? null : stderr.trim()
-}
+// ---------- ビルドとテスト ----------
 
 const normalize = (text) =>
   text
     .replace(/\r/g, '')
     .split('\n')
-    .map((line) => line.trimEnd())
+    .map((row) => row.trimEnd())
     .join('\n')
     .trimEnd()
 
@@ -149,7 +169,8 @@ function runSample(problem, sample) {
     const child = spawn('node', [problem.bundle], { stdio: [input, 'pipe', 'pipe'] })
     let stdout = ''
     let stderr = ''
-    const timer = setTimeout(() => child.kill('SIGKILL'), 4000)
+    const started = Date.now()
+    const timer = setTimeout(() => child.kill('SIGKILL'), TIMEOUT_MS)
     child.stdout.on('data', (chunk) => {
       stdout += chunk
     })
@@ -159,59 +180,121 @@ function runSample(problem, sample) {
     child.on('close', (status, signal) => {
       clearTimeout(timer)
       closeSync(input)
-      if (signal === 'SIGKILL') return resolve({ verdict: 'TLE', stdout, stderr })
-      if (status !== 0) return resolve({ verdict: 'RE', stdout, stderr })
-      if (sample.expected === null) return resolve({ verdict: 'AC', stdout, stderr })
-      const ok = normalize(stdout) === normalize(sample.expected)
-      resolve({ verdict: ok ? 'AC' : 'WA', stdout, stderr })
+      const ms = Date.now() - started
+      if (signal === 'SIGKILL') return resolve({ verdict: 'TLE', stdout, stderr, ms })
+      if (status !== 0) return resolve({ verdict: 'RE', stdout, stderr, ms })
+      if (sample.expected === null) return resolve({ verdict: 'AC', stdout, stderr, ms })
+      resolve({ verdict: normalize(stdout) === normalize(sample.expected) ? 'AC' : 'WA', stdout, stderr, ms })
     })
   })
 }
 
-const isBlank = (problem) => readFileSync(problem.source, 'utf8') === template
+const excerpt = (text, label, color, limit = 3) => {
+  const rows = normalize(text).split('\n')
+  if (text.trim() === '') return [line(`  ${label} (なし)`, 2)]
+  return rows
+    .slice(0, limit)
+    .map((row, index) => line(`  ${index === 0 ? label : '    '} ${row}`, color))
+    .concat(rows.length > limit ? [line(`      … 他 ${rows.length - limit} 行`, 2)] : [])
+}
+
+const running = new Map()
 
 async function check(problem) {
-  problem.detail = null
-  if (isBlank(problem)) {
+  if (problem.submitting) return
+  if (readFileSync(problem.source, 'utf8') === template) {
     problem.status = 'blank'
-    problem.results.clear()
+    problem.body = [line('未着手', 2)]
     return render()
   }
-  problem.status = 'running'
-  problem.results.clear()
-  for (const sample of problem.samples) problem.results.set(sample.name, 'pending')
-  render()
+  if (running.has(problem.letter)) return running.get(problem.letter).then(() => check(problem))
 
-  const error = await buildProblem(problem)
-  if (error !== null) {
-    problem.status = 'CE'
-    problem.detail = { title: 'コンパイルエラー', body: error }
-    return render()
-  }
-
-  let worst = 'AC'
-  for (const sample of problem.samples) {
-    problem.results.set(sample.name, 'running')
+  const task = (async () => {
+    problem.status = 'building'
+    problem.body = [line('build...', 33)]
     render()
-    const { verdict, stdout, stderr } = await runSample(problem, sample)
-    problem.results.set(sample.name, verdict)
-    if (verdict !== 'AC' && worst === 'AC') {
-      worst = verdict
-      problem.detail = {
-        title: `sample-${sample.name}: ${verdict}`,
-        body: [
-          `${dim('入力')}\n${sample.input.trimEnd()}`,
-          `${dim('期待')}\n${(sample.expected ?? '').trimEnd()}`,
-          `${dim('出力')}\n${stdout.trimEnd() || dim('(なし)')}`,
-          stderr.trim() ? `${dim('stderr')}\n${stderr.trim()}` : '',
-        ]
-          .filter(Boolean)
-          .join('\n'),
-      }
+
+    const built = await exec('esbuild-nix', [
+      problem.source,
+      '--bundle',
+      `--outfile=${problem.bundle}`,
+      '--platform=node',
+      '--format=esm',
+      '--target=node22',
+      '--tree-shaking=true',
+      '--log-level=error',
+    ])
+    if (built.status !== 0) {
+      problem.status = 'CE'
+      problem.body = [
+        line('ビルドエラー', 31),
+        ...built.output
+          .trim()
+          .split('\n')
+          .map((row) => line(row, 0)),
+      ]
+      return render()
     }
+
+    problem.status = 'running'
+    problem.body = problem.samples.map((sample) => line(`${VERDICT.pending.mark} sample-${sample.name}`, 2))
     render()
-  }
-  problem.status = problem.samples.length === 0 ? 'pending' : worst
+
+    let worst = 'AC'
+    let passed = 0
+    const body = []
+    for (const [index, sample] of problem.samples.entries()) {
+      problem.body = [...body, line(`${VERDICT.running.mark} sample-${sample.name}`, 33)]
+      render()
+      const { verdict, stdout, stderr, ms } = await runSample(problem, sample)
+      const style = VERDICT[verdict]
+      body.push(line(`${style.mark} sample-${sample.name}  ${ms}ms`, style.color))
+      if (verdict === 'AC') passed++
+      else {
+        if (worst === 'AC') worst = verdict
+        if (verdict === 'WA') {
+          body.push(...excerpt(sample.expected ?? '', '期待', 2))
+          body.push(...excerpt(stdout, '出力', 31))
+        } else if (stderr.trim()) {
+          body.push(...excerpt(stderr, verdict === 'TLE' ? '途中' : 'err', 35, 4))
+        }
+      }
+      problem.body = [
+        ...body,
+        ...problem.samples.slice(index + 1).map((rest) => line(`${VERDICT.pending.mark} sample-${rest.name}`, 2)),
+      ]
+      render()
+    }
+
+    problem.status = problem.samples.length === 0 ? 'pending' : worst
+    problem.body = [line(`${passed}/${problem.samples.length} AC`, STATUS_COLOR[problem.status]), ...body]
+    render()
+  })()
+
+  running.set(problem.letter, task)
+  await task
+  running.delete(problem.letter)
+}
+
+// ---------- 提出 ----------
+
+async function submit(problem) {
+  problem.submitting = true
+  problem.body = [line('提出中...', 33)]
+  render()
+  const language = process.env.ATCODER_LANGUAGE
+  const args = ['submit', problem.url, problem.bundle, '--yes', '--wait', '0', '--no-open']
+  if (language) args.push('--language', language)
+  const log = []
+  const { status } = await exec('oj', args, (row) => {
+    const text = row.replace(/^\w+:[\w.]+:/, '').trim()
+    if (text) log.push(line(text, /error/i.test(text) ? 31 : 0))
+    problem.body = log.slice(-40)
+    render()
+  })
+  log.push(line(status === 0 ? '提出しました' : `提出に失敗しました (exit ${status})`, status === 0 ? 32 : 31))
+  problem.body = log.slice(-40)
+  problem.submitting = false
   render()
 }
 
@@ -219,76 +302,93 @@ async function check(problem) {
 
 let problems = []
 let selected = 0
+let confirming = false
 let renderQueued = false
 
-function render() {
+const render = () => {
   if (renderQueued) return
   renderQueued = true
   setTimeout(draw, 16)
 }
 
-const pad = (text, width) => (text.length >= width ? text.slice(0, width) : text + ' '.repeat(width - text.length))
-const cell = (text, width, color) => paint(color, pad(text, width))
-
 function draw() {
   renderQueued = false
-  const columns = process.stdout.columns || 100
-  const width = Math.max(8, Math.min(14, Math.floor((columns - 2) / Math.max(problems.length, 1))))
-  const lines = []
+  const columns = process.stdout.columns || 120
+  const rows = process.stdout.rows || 30
+  const fits = Math.max(1, Math.floor((columns - 1) / MIN_PANE))
+  const shown = Math.min(problems.length, fits)
+  const start = Math.min(Math.max(0, selected - (shown - 1)), Math.max(0, problems.length - shown))
+  const visible = problems.slice(start, start + shown)
+  const width = Math.max(MIN_PANE, Math.floor((columns - 1) / shown))
+  const inner = width - 3
+  const height = Math.max(4, rows - 5)
 
   const done = problems.filter((problem) => problem.status === 'AC').length
   const active = problems.filter((problem) => problem.status !== 'blank').length
-  lines.push(`${bold(contest)}  ${done}/${active} AC   ${dim('a-z: 選択  r: 全再実行  q: 終了')}`)
-  lines.push('')
+  const hidden = problems.length - shown
+  const out = [
+    `${paint(1, contest)}  ${paint(32, `${done}/${active} AC`)}${hidden > 0 ? paint(2, `  (+${hidden}問は画面外)`) : ''}`,
+  ]
 
-  lines.push(`  ${problems.map((p, i) => cell(p.letter, width, i === selected ? '1;36' : '1')).join('')}`)
-  lines.push(`  ${problems.map((p) => cell(STATUS[p.status].label, width, STATUS[p.status].color)).join('')}`)
-
-  const rows = Math.max(0, ...problems.map((problem) => problem.samples.length))
-  for (let row = 0; row < rows; row++) {
-    const line = problems
-      .map((problem) => {
-        const sample = problem.samples[row]
-        if (!sample) return pad('', width)
-        const verdict = problem.results.get(sample.name) ?? 'pending'
-        const style = STATUS[verdict] ?? STATUS.pending
-        return cell(`${style.mark} ${sample.name}`, width, style.color)
+  const cap = (corners, withLabel) =>
+    visible
+      .map((problem, index) => {
+        const label = withLabel ? ` ${problem.letter} ${STATUS_LABEL[problem.status]} ` : ''
+        const fill = Math.max(0, width - 4 - widthOf(label))
+        const bar = `${corners[0]}─${label}${'─'.repeat(fill)}${corners[1]}`
+        return `${paint(start + index === selected ? '1;36' : 2, bar)} `
       })
       .join('')
-    lines.push(`  ${line}`)
-  }
 
-  const current = problems[selected]
-  lines.push('')
-  lines.push(dim('─'.repeat(Math.min(columns - 1, 60))))
-  if (current?.detail) {
-    lines.push(`${bold(current.letter)} ${paint(31, current.detail.title)}`)
-    lines.push(...current.detail.body.split('\n').slice(0, Math.max(4, (process.stdout.rows || 30) - lines.length - 2)))
-  } else if (current) {
-    lines.push(
-      `${bold(current.letter)} ${dim(current.status === 'blank' ? '未着手' : STATUS[current.status].label)}  ${dim(current.source)}`,
+  out.push(cap('╭╮', true))
+  for (let row = 0; row < height; row++) {
+    out.push(
+      visible
+        .map((problem, index) => {
+          const edge = paint(start + index === selected ? '1;36' : 2, '│')
+          const content = problem.body[row]
+          return `${edge}${content ? paint(content.color, fit(content.text, inner)) : ' '.repeat(inner)}${edge} `
+        })
+        .join(''),
     )
   }
+  out.push(cap('╰╯', false))
 
-  process.stdout.write(`\x1b[H${lines.map((line) => `${line}\x1b[K`).join('\n')}\n\x1b[J`)
+  const current = problems[selected]
+  out.push('')
+  if (confirming && current) {
+    const warn = current.status === 'AC' ? 32 : 31
+    out.push(
+      `${paint(warn, `${current.letter} (${current.status})`)} を提出しますか?  ${paint(1, 'y')} で提出 / ${paint(1, 'n')} で中止  ${paint(2, current.url)}`,
+    )
+  } else {
+    out.push(paint(2, `${problems.map((p) => p.letter).join('')}: 選択   s: 提出   r: 全再実行   q: 終了`))
+  }
+
+  process.stdout.write(`\x1b[H${out.map((row) => `${row}\x1b[K`).join('\n')}\n\x1b[J`)
 }
 
 // ---------- 監視と入力 ----------
 
-function watchFiles(onSourceChange, onLibraryChange) {
+const checkAll = () => problems.reduce((chain, problem) => chain.then(() => check(problem)), Promise.resolve())
+
+function watchFiles() {
   let timer = null
   const pending = new Set()
   const flush = () => {
     timer = null
     const changed = [...pending]
     pending.clear()
-    if (changed.includes('*')) return onLibraryChange()
-    for (const letter of changed) onSourceChange(letter)
+    if (changed.includes('*')) return checkAll()
+    for (const letter of changed) {
+      const problem = problems.find((item) => item.letter === letter)
+      if (problem) check(problem)
+    }
   }
   const queue = (key) => {
     pending.add(key)
     if (timer) clearTimeout(timer)
-    timer = setTimeout(flush, 120)
+    timer = setTimeout(flush, 150)
   }
   watch(contestDir, { recursive: true }, (_event, file) => {
     const letter = file?.split(/[/\\]/)[0]
@@ -299,18 +399,10 @@ function watchFiles(onSourceChange, onLibraryChange) {
   })
 }
 
-const checkAll = () => problems.reduce((chain, problem) => chain.then(() => check(problem)), Promise.resolve())
-
-function restore() {
-  process.stdout.write('\x1b[?25h\x1b[?1049l')
-}
-
-const problemList = await setup()
-problems = problemList
-selected = 0
+problems = await setup()
 
 process.stdout.write('\x1b[?1049h\x1b[?25l')
-process.on('exit', restore)
+process.on('exit', () => process.stdout.write('\x1b[?25h\x1b[?1049l'))
 process.on('SIGINT', () => process.exit(0))
 process.stdout.on('resize', render)
 
@@ -319,21 +411,28 @@ if (process.stdin.isTTY) {
   process.stdin.resume()
   process.stdin.setEncoding('utf8')
   process.stdin.on('data', (key) => {
+    if (confirming) {
+      confirming = false
+      if (key === 'y') submit(problems[selected])
+      return render()
+    }
     if (key === 'q' || key === '\x03') process.exit(0)
-    else if (key === 'r') checkAll()
+    if (key === 'r') return checkAll()
+    if (key === 's') {
+      const target = problems[selected]
+      // 未着手・ビルド失敗・テスト実行中は、bundle が無い/古いので提出させない
+      confirming = Boolean(target) && existsSync(target.bundle) && !running.has(target.letter)
+      return render()
+    }
+    if (key === '\x1b[C' || key === '\x1b[B') selected = Math.min(selected + 1, problems.length - 1)
+    else if (key === '\x1b[D' || key === '\x1b[A') selected = Math.max(selected - 1, 0)
     else {
       const index = problems.findIndex((problem) => problem.letter === key)
-      if (index >= 0) {
-        selected = index
-        render()
-      }
+      if (index >= 0) selected = index
     }
+    render()
   })
 }
 
-watchFiles(
-  (letter) => check(problems.find((problem) => problem.letter === letter)),
-  () => checkAll(),
-)
-
+watchFiles()
 await checkAll()
