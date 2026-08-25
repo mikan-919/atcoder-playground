@@ -1,3 +1,17 @@
+interface ArrayConstructor {
+  /**
+   * 英小文字`a`〜`z`の配列を返します。
+   * 呼び出すたびに新しい配列を返すので、書き換えても影響しません。
+   * 大文字が欲しい場合は`Array.alphabets().map((c) => c.toUpperCase())`とします。
+   *
+   * @example
+   * ```ts
+   * Array.alphabets() // ['a', 'b', ..., 'z']
+   * ```
+   */
+  alphabets(): string[]
+}
+
 interface Array<T> {
   /**
    * 二次元配列の行と列を入れ替えます。
@@ -140,6 +154,12 @@ interface Array<T extends number | bigint> {
    */
   max(defaultValue: T): T
 }
+
+Object.defineProperty(Array, 'alphabets', {
+  value: (): string[] => Array.from({ length: 26 }, (_, i) => String.fromCharCode(97 + i)),
+  writable: true,
+  configurable: true,
+})
 
 Object.defineProperties(Array.prototype, {
   transpose: {
