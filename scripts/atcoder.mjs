@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 const [, , command, argument] = process.argv
@@ -69,7 +69,15 @@ function build(problem, watch = false) {
     console.error(`${source} がありません。先に bun run new -- ${problem.contest}/${problem.task} を実行してください。`)
     process.exit(2)
   }
-  const args = [source, '--bundle', `--outfile=${output}`, '--platform=node', '--format=esm', '--target=node22', '--tree-shaking=true']
+  const args = [
+    source,
+    '--bundle',
+    `--outfile=${output}`,
+    '--platform=node',
+    '--format=esm',
+    '--target=node22',
+    '--tree-shaking=true',
+  ]
   if (watch) args.push('--watch')
   run('esbuild-nix', args)
 }
@@ -126,7 +134,9 @@ switch (command) {
     select(problem)
     const { tests } = paths(problem)
     if (!hasTests(tests)) {
-      console.error(`${tests} がありません。bun run download -- ${problem.contest}/${problem.task} を実行してください。`)
+      console.error(
+        `${tests} がありません。bun run download -- ${problem.contest}/${problem.task} を実行してください。`,
+      )
       process.exit(2)
     }
     build(problem)
@@ -144,7 +154,8 @@ switch (command) {
     const problem = problemFromArgument()
     select(problem)
     build(problem)
-    run('oj', ['submit', problem.url, output])
+    // oj submit は AtCoder のページ変更で壊れているため、提出フォームを直接叩くヘルパーを使う
+    run('python3', ['scripts/submit-atcoder.py', problem.url, output])
     break
   }
   case 'watch': {

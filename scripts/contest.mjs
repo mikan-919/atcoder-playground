@@ -282,17 +282,16 @@ async function submit(problem) {
   problem.submitting = true
   problem.body = [line('提出中...', 33)]
   render()
-  const language = process.env.ATCODER_LANGUAGE
-  const args = ['submit', problem.url, problem.bundle, '--yes', '--wait', '0', '--no-open']
-  if (language) args.push('--language', language)
+  // oj submit は AtCoder のページ変更で壊れているため、提出フォームを直接叩くヘルパーを使う
+  const args = ['scripts/submit-atcoder.py', problem.url, problem.bundle]
   const log = []
-  const { status } = await exec('oj', args, (row) => {
+  const { status } = await exec('python3', args, (row) => {
     const text = row.replace(/^\w+:[\w.]+:/, '').trim()
     if (text) log.push(line(text, /error/i.test(text) ? 31 : 0))
     problem.body = log.slice(-40)
     render()
   })
-  log.push(line(status === 0 ? '提出しました' : `提出に失敗しました (exit ${status})`, status === 0 ? 32 : 31))
+  if (status !== 0) log.push(line(`提出に失敗しました (exit ${status})`, 31))
   problem.body = log.slice(-40)
   problem.submitting = false
   render()

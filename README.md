@@ -55,7 +55,7 @@ abcdefg: 選択   s: 提出   r: 全再実行   q: 終了
 | `r` | 全問を再テスト |
 | `q` | 終了 |
 
-提出は`oj submit`をそのまま呼びます。言語の推測を固定したい場合は`ATCODER_LANGUAGE`を設定してください。画面幅が足りないときはペインが1問22桁まで詰められ、入りきらない問題は選択に応じてスクロールします。
+提出言語は既定で`JavaScript (Bun)`です。変えたい場合は`ATCODER_LANGUAGE`に言語名の一部（`Node.js`など）か言語IDを設定してください。画面幅が足りないときはペインが1問22桁まで詰められ、入りきらない問題は選択に応じてスクロールします。
 
 1問だけ扱う場合は、短い問題IDで解答ファイルを作り、サンプルを取得します。
 
@@ -104,6 +104,17 @@ dist/Main.js                 bundle済み提出ファイル（Git対象外）
 ```
 
 共通処理は`src/`へ追加し、解答から相対importします。`new`は既存の`main.ts`を上書きしないため、同じ問題を再度指定しても解答は保持されます。以前の`src/index.ts`は`solutions/legacy/current/main.ts`へ移動済みです。
+
+### 提出について
+
+`oj submit`はAtCoderのページ変更（`Memory Limit: 1024 MiB` — ojは`MB`/`KB`しか解釈できない）で、提出前にAssertionErrorで落ちます。`bun run submit`と`contest`のTUIは、代わりに`scripts/submit-atcoder.py`が提出フォームを直接POSTします。cookieは`oj`と同じ`~/.local/share/online-judge-tools/cookie.jar`を読みます。
+
+提出せずに言語の解決だけ確認できます。
+
+```bash
+python3 scripts/submit-atcoder.py https://atcoder.jp/contests/abc472/tasks/abc472_a dist/Main.js --dry-run
+```
+
 
 ## コマンド
 
