@@ -2,16 +2,14 @@ import '../../../src/extends'
 import { readLine, readNumbers } from '../../../src/stdin'
 import { put } from '../../../src/stdout'
 
-const [N] = readNumbers()
+const [_N] = readNumbers()
 const S = readLine()
 
-// 同じ文字 c の連続 run が長さ L なら、c を 1..L 個並べた文字列が作れる。
-// 文字列としての重複は排除されるので、答えは「文字ごとの最長 run」の合計。
+// 文字 c の連続が長さ L なら c, cc, ..., c*L の L 種類が作れる。
+// 重複は種類として数えないので、答えは「文字ごとの最長の連続」の合計。
 const best = new Map<string, number>()
-let run = 0
-for (let i = 0; i < N; i++) {
-  run = i > 0 && S[i] === S[i - 1] ? run + 1 : 1
-  best.set(S[i], Math.max(best.get(S[i]) ?? 0, run))
+for (const [char, count] of S.toRunLength()) {
+  best.set(char, Math.max(best.get(char) ?? 0, count))
 }
 
-put([...best.values()].reduce((a, b) => a + b, 0))
+put([...best.values()].sum())
