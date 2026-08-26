@@ -12,3 +12,6 @@ __pycache__/
 
 # コンテスト単位の問題一覧キャッシュ
 solutions/**/.tasks.json
+
+# difficulty のキャッシュ
+.cache/
