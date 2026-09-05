@@ -54,10 +54,7 @@ interface String {
 
 Object.defineProperties(String.prototype, {
   terms: {
-    value: function <T>(
-      this: string,
-      mapper?: (value: string, index: number, array: string[]) => T,
-    ): string[] | T[] {
+    value: function <T>(this: string, mapper?: (value: string, index: number, array: string[]) => T): string[] | T[] {
       const values = this.split(' ')
       return mapper ? values.map(mapper) : values
     },

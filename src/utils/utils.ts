@@ -52,4 +52,3 @@ export function gcd(a: number, b: number): number {
 export function lcm(a: number, b: number): number {
   return (a * b) / gcd(a, b)
 }
-
