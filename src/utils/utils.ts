@@ -5,7 +5,11 @@ export function memorize<T extends unknown[], U>(fn: BaseFunc<T, U>): BaseFunc<T
 
   // ラップされた関数
   const wrapped: BaseFunc<T, U> = (...args: T): U => {
-    const key = JSON.stringify(args)
+    const key = JSON.stringify(args, (_key, value) => {
+      if (typeof value === 'bigint') return `bigint:${value}`
+      if (typeof value === 'string') return `string:${value}`
+      return value
+    })
     if (cache.has(key)) return cache.get(key) as U
 
     const result = fn(...args)
