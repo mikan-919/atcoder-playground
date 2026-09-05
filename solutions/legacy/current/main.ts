@@ -1,24 +1,15 @@
 import '../../../src/extends'
-import { readNumbers } from '../../../src/stdin'
-import { no, put, putArray, yes } from '../../../src/stdout'
+import { readLine, readNumberLines, readNumbers } from '../../../src/stdin'
+import { put, putArray, stop } from '../../../src/stdout'
 import { range } from '../../../src/utils/utils'
 
-let [N,K]= readNumbers()
-const A = readNumbers()
+const [t] = readNumbers()
 
-let S = []
-let score=0
-let state=0
-for (const a of A) {
-    S.push(a)
-    let count=0
-    for (const i of range(S.length)) {
-      count+=(S[S.length-i-1])
-      if (count % K === 0) {
-          score++
-          S = []
-          break
-    }
-    }
+for (const i of range(t)) {
+  const [n] = readNumbers()
+  const ab = readNumberLines(n)
+  const costSort =
+      ab.toSorted((a, b) => a[0] - b[0])
+  const diffSort =
+    ab.toSorted((a, b) => (a[0]-a[1]) - (b[0]-b[1]))
 }
-put(score)

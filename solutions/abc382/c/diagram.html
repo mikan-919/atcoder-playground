@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ABC382 C 図解</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17202a;
+      --muted: #64748b;
+      --line: #d8dee9;
+      --paper: #f8fafc;
+      --card: #ffffff;
+      --blue: #2563eb;
+      --blue-bg: #dbeafe;
+      --green: #15803d;
+      --green-bg: #dcfce7;
+      --orange: #c2410c;
+      --orange-bg: #ffedd5;
+      --purple: #7e22ce;
+      --purple-bg: #f3e8ff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Noto Sans JP", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: linear-gradient(135deg, #eef4ff 0%, var(--paper) 48%, #fff7ed 100%);
+      line-height: 1.6;
+    }
+
+    main {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 34px 0 56px;
+    }
+
+    h1, h2, p { margin-top: 0; }
+    h1 { margin-bottom: 8px; font-size: clamp(1.55rem, 3vw, 2.35rem); }
+    h2 { margin-bottom: 12px; font-size: 1.15rem; }
+
+    .lead {
+      max-width: 850px;
+      margin-bottom: 22px;
+      color: #334155;
+      font-size: 1.02rem;
+    }
+
+    .panel {
+      margin: 18px 0;
+      padding: 20px;
+      background: rgb(255 255 255 / 88%);
+      border: 1px solid rgb(216 222 233 / 90%);
+      border-radius: 18px;
+      box-shadow: 0 12px 30px rgb(15 23 42 / 7%);
+    }
+
+    .formula {
+      display: inline-block;
+      padding: 4px 9px;
+      color: #0f3f9e;
+      background: var(--blue-bg);
+      border-radius: 7px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .92em;
+    }
+
+    .three-columns {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .order-card {
+      min-height: 144px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--card);
+    }
+
+    .order-card h3 {
+      margin: 0 0 6px;
+      font-size: .98rem;
+    }
+
+    .order-card p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    .tag-row, .people-row, .query-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      align-items: center;
+    }
+
+    .tag {
+      padding: 5px 9px;
+      border-radius: 8px;
+      background: #f1f5f9;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .88rem;
+    }
+
+    .tag.blue { color: #1d4ed8; background: var(--blue-bg); }
+    .tag.green { color: var(--green); background: var(--green-bg); }
+    .tag.orange { color: var(--orange); background: var(--orange-bg); }
+
+    .step-head {
+      display: flex;
+      gap: 14px;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .step-head h2 { margin-bottom: 0; }
+
+    button {
+      padding: 9px 14px;
+      color: white;
+      background: var(--blue);
+      border: 0;
+      border-radius: 9px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button.secondary { color: #1e3a8a; background: var(--blue-bg); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+
+    .status {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .metric {
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 1.12rem;
+    }
+
+    .metric small { color: var(--muted); }
+
+    .stage {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .stage-column {
+      min-width: 0;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+    }
+
+    .stage-column h3 {
+      margin: 0 0 4px;
+      font-size: 1rem;
+    }
+
+    .stage-column > p {
+      margin-bottom: 14px;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    .person, .sorted-person, .query {
+      position: relative;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: #f8fafc;
+      transition: .18s ease;
+    }
+
+    .person { min-width: 112px; }
+    .sorted-person { min-width: 158px; }
+    .query { min-width: 114px; }
+
+    .person .number, .sorted-person .number, .query .number {
+      color: var(--muted);
+      font-size: .78rem;
+    }
+
+    .person strong, .sorted-person strong, .query strong {
+      display: block;
+      margin-top: 2px;
+      font-size: 1.03rem;
+    }
+
+    .person.eligible, .sorted-person.added {
+      color: #14532d;
+      background: var(--green-bg);
+      border-color: #86efac;
+    }
+
+    .person.eater, .sorted-person.best {
+      color: #1e3a8a;
+      background: var(--blue-bg);
+      border: 2px solid var(--blue);
+    }
+
+    .sorted-person.next {
+      color: #9a3412;
+      background: var(--orange-bg);
+      border-color: #fdba74;
+    }
+
+    .sorted-person.next::after {
+      content: "次に判定";
+      position: absolute;
+      top: -11px;
+      right: 8px;
+      padding: 1px 6px;
+      color: #9a3412;
+      background: #fff7ed;
+      border: 1px solid #fdba74;
+      border-radius: 6px;
+      font-size: .72rem;
+    }
+
+    .query.done { background: var(--green-bg); border-color: #86efac; }
+    .query.current { outline: 3px solid rgb(37 99 235 / 20%); }
+
+    .arrow {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 42px;
+      color: var(--purple);
+      font-size: 1.45rem;
+      font-weight: 700;
+    }
+
+    .explanation {
+      margin-top: 16px;
+      padding: 13px 15px;
+      color: #334155;
+      background: var(--purple-bg);
+      border-left: 4px solid #a855f7;
+      border-radius: 9px;
+    }
+
+    .explanation strong { color: #581c87; }
+
+    .invariant {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .invariant li {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 9px;
+      align-items: start;
+      margin: 9px 0;
+    }
+
+    .invariant li::before {
+      content: "✓";
+      display: grid;
+      width: 24px;
+      height: 24px;
+      place-items: center;
+      color: var(--green);
+      background: var(--green-bg);
+      border-radius: 50%;
+      font-weight: 700;
+    }
+
+    .complexity {
+      display: inline-block;
+      padding: 8px 12px;
+      color: #1e3a8a;
+      background: var(--blue-bg);
+      border-radius: 9px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    @media (max-width: 780px) {
+      .three-columns, .stage { grid-template-columns: 1fr; }
+      .arrow { min-height: 20px; transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>ABC382 C：ソートする順番と食べる順番</h1>
+    <p class="lead">
+      美食度順に並べるのは、人の前を通る順番を変えるためではありません。
+      「今の美味しさで食べられる客」を漏れなく追加するためです。
+      食べる人は、追加した客の<strong>元の人番号の最小値</strong>で決まります。
+    </p>
+
+    <section class="panel">
+      <h2>この例</h2>
+      <div class="three-columns">
+        <article class="order-card">
+          <h3>人の実際の順番</h3>
+          <div class="tag-row">
+            <span class="tag">人1: A=2</span>
+            <span class="tag">人2: A=1</span>
+          </div>
+          <p>寿司は必ず人1、人2の順に通ります。</p>
+        </article>
+        <article class="order-card">
+          <h3>候補を集める順番</h3>
+          <div class="tag-row">
+            <span class="tag green">A=1, 人2</span>
+            <span class="tag green">A=2, 人1</span>
+          </div>
+          <p>これは食べる順番ではなく、候補を追加する順番です。</p>
+        </article>
+        <article class="order-card">
+          <h3>寿司を調べる順番</h3>
+          <div class="tag-row">
+            <span class="tag blue">B=1</span>
+            <span class="tag blue">B=2</span>
+          </div>
+          <p>Bを小さい順に見るので、候補は増えるだけです。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="step-head">
+        <h2>ボタンで処理を進める</h2>
+        <div>
+          <button id="next" type="button">次の寿司を処理</button>
+          <button id="reset" class="secondary" type="button">最初に戻す</button>
+        </div>
+      </div>
+
+      <div class="status">
+        <div class="metric"><small>現在のB</small><strong id="current-b">未処理</strong></div>
+        <div class="metric"><small>p（未追加の先頭）</small><strong id="pointer">0</strong></div>
+        <div class="metric"><small>best（元の人番号）</small><strong id="best">なし</strong></div>
+      </div>
+
+      <div class="stage">
+        <article class="stage-column">
+          <h3>1. 実際の人の順番</h3>
+          <p>青い客が、この寿司を最初に取る客です。</p>
+          <div id="original-people" class="people-row"></div>
+        </article>
+
+        <article class="stage-column">
+          <h3>2. 美食度順に候補を追加</h3>
+          <p>追加済みの客だけで、元の番号の最小値を持ちます。</p>
+          <div id="sorted-people" class="people-row"></div>
+        </article>
+      </div>
+
+      <div class="arrow">↓</div>
+
+      <article class="stage-column">
+        <h3>3. Bを昇順に処理し、元の寿司順へ戻す</h3>
+        <p>並べ替えたのは計算の順番です。答えは元の寿司番号へ書き戻します。</p>
+        <div id="queries" class="query-row"></div>
+      </article>
+
+      <div id="explanation" class="explanation"></div>
+    </section>
+
+    <section class="panel">
+      <h2>この方法で順番が逆にならない理由</h2>
+      <ul class="invariant">
+        <li>現在のB以下の美食度を持つ客だけを候補に入れる。</li>
+        <li>候補に入った客の元の人番号の最小値を持つ。</li>
+        <li>その番号より前の客は、全員Bより美食度が高いので食べられない。</li>
+        <li>その番号の客は食べられるので、実際に最初に取る客になる。</li>
+      </ul>
+      <p class="complexity">各客は一度だけ追加、各寿司は一度だけ処理：O(N + M)（ソート後）</p>
+    </section>
+  </main>
+
+  <script>
+    // 元の人番号は0始まりで持ち、表示時だけ1を足す。
+    const A = [2, 1]
+    const originalQueries = [
+      { value: 2, index: 0 },
+      { value: 1, index: 1 },
+    ]
+
+    const people = A.map((value, index) => ({ value, index }))
+    const sortedPeople = [...people].sort((a, b) => a.value - b.value)
+    const sortedQueries = [...originalQueries].sort((a, b) => a.value - b.value)
+
+    let pointer = 0
+    let best = Infinity
+    let step = 0
+    let lastQuery = null
+    let lastAdded = []
+    const answers = Array(originalQueries.length).fill(null)
+
+    const byId = (id) => document.getElementById(id)
+
+    function personText(person) {
+      return `人${person.index + 1}`
+    }
+
+    function renderOriginalPeople() {
+      const currentB = lastQuery?.value
+      const eater = best === Infinity ? -1 : best
+      byId('original-people').innerHTML = people.map((person) => {
+        const eligible = currentB !== undefined && person.value <= currentB
+        const isEater = eligible && person.index === eater
+        const classes = ['person']
+        if (eligible) classes.push('eligible')
+        if (isEater) classes.push('eater')
+        return `<div class="${classes.join(' ')}">
+          <span class="number">元の順番 ${person.index + 1}</span>
+          <strong>${personText(person)}</strong>
+          <span>A=${person.value}${isEater ? ' ← 食べる' : eligible ? ' ← 候補' : ''}</span>
+        </div>`
+      }).join('')
+    }
+
+    function renderSortedPeople() {
+      const currentB = lastQuery?.value
+      byId('sorted-people').innerHTML = sortedPeople.map((person, index) => {
+        const added = index < pointer
+        const next = index === pointer && pointer < sortedPeople.length
+        const isBest = added && person.index === best
+        const classes = ['sorted-person']
+        if (added) classes.push('added')
+        if (next) classes.push('next')
+        if (isBest) classes.push('best')
+        return `<div class="${classes.join(' ')}">
+          <span class="number">美食度順 ${index + 1}</span>
+          <strong>A=${person.value}, ${personText(person)}</strong>
+          <span>${added ? '追加済み' : next ? `A=${person.value} と B=${currentB ?? '？'}を比較` : '未確認'}</span>
+        </div>`
+      }).join('')
+    }
+
+    function renderQueries() {
+      byId('queries').innerHTML = originalQueries.map((query) => {
+        const answer = answers[query.index]
+        const isCurrent = lastQuery?.index === query.index
+        const classes = ['query']
+        if (answer !== null) classes.push('done')
+        if (isCurrent) classes.push('current')
+        return `<div class="${classes.join(' ')}">
+          <span class="number">元の寿司 ${query.index + 1}</span>
+          <strong>B=${query.value}</strong>
+          <span>${answer === null ? '未処理' : answer === -1 ? '誰も取らない' : `答え：人${answer}`}</span>
+        </div>`
+      }).join('')
+    }
+
+    function renderText() {
+      byId('current-b').textContent = lastQuery ? lastQuery.value : '未処理'
+      byId('pointer').textContent = pointer
+      byId('best').textContent = best === Infinity ? 'なし' : `人${best + 1}`
+
+      if (!lastQuery) {
+        byId('explanation').innerHTML = '「次の寿司を処理」を押してください。最初は<strong>B=1</strong>を処理します。'
+        return
+      }
+
+      const addedText = lastAdded.length === 0
+        ? '新しく追加された客はいません。'
+        : `${lastAdded.map(personText).join('、')}を追加しました。`
+      const answerText = best === Infinity ? '誰も取らない' : `人${best + 1}`
+      byId('explanation').innerHTML = `<strong>B=${lastQuery.value}</strong>：${addedText}<br>
+        追加済みの客の元番号の最小値は<strong>${best === Infinity ? 'なし' : best + 1}</strong>なので、実際に食べるのは<strong>${answerText}</strong>です。`
+    }
+
+    function render() {
+      renderOriginalPeople()
+      renderSortedPeople()
+      renderQueries()
+      renderText()
+      byId('next').disabled = step >= sortedQueries.length
+    }
+
+    byId('next').addEventListener('click', () => {
+      const query = sortedQueries[step]
+      lastAdded = []
+      while (pointer < sortedPeople.length && sortedPeople[pointer].value <= query.value) {
+        const person = sortedPeople[pointer]
+        lastAdded.push(person)
+        best = Math.min(best, person.index)
+        pointer++
+      }
+      answers[query.index] = best === Infinity ? -1 : best + 1
+      lastQuery = query
+      step++
+      render()
+    })
+
+    byId('reset').addEventListener('click', () => {
+      pointer = 0
+      best = Infinity
+      step = 0
+      lastQuery = null
+      lastAdded = []
+      answers.fill(null)
+      render()
+    })
+
+    render()
+  </script>
+</body>
+</html>
