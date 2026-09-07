@@ -4,11 +4,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import {
+  fallbackTaskIds,
+  isEmptySample,
   markSampleSource,
   parseTaskCache,
   parseTaskIds,
   readAtCoderCookieHeader,
   replaceSampleDirectory,
+  runnableSampleFiles,
   samplesAreFrom,
   waitForTaskIds,
 } from './contest-data.mjs'
@@ -21,6 +24,19 @@ test('対象コンテストの問題だけをHTMLから読む', () => {
     <a href="/contests/abc474/tasks/abc474_a">A duplicate</a>
   `
   assert.deepEqual(parseTaskIds('abc474', html), ['abc474_a', 'abc474_b'])
+})
+
+test('問題一覧を取得できないABCはAからGを仮定する', () => {
+  assert.deepEqual(fallbackTaskIds('abc474'), [
+    'abc474_a',
+    'abc474_b',
+    'abc474_c',
+    'abc474_d',
+    'abc474_e',
+    'abc474_f',
+    'abc474_g',
+  ])
+  assert.equal(fallbackTaskIds('arc200'), null)
 })
 
 test('別コンテストからコピーされた旧形式キャッシュを拒否する', () => {
@@ -70,6 +86,18 @@ test('取得済みサンプルだけを入れ替えて手作りケースを残�
   assert.equal(readFileSync(join(current, 'sample-1.in'), 'utf8'), 'new sample\n')
   assert.equal(readFileSync(join(current, 'corner.in'), 'utf8'), 'custom case\n')
   assert.equal(samplesAreFrom(current, url), true)
+})
+
+test('空の入出力は実行対象から除外する', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'atcoder-empty-sample-'))
+  writeFileSync(join(directory, 'sample-1.in'), '')
+  writeFileSync(join(directory, 'sample-1.out'), '')
+  writeFileSync(join(directory, 'sample-2.in'), '1\n')
+  writeFileSync(join(directory, 'sample-2.out'), '2\n')
+
+  assert.equal(isEmptySample('', ''), true)
+  assert.equal(isEmptySample('1\n', ''), false)
+  assert.deepEqual(runnableSampleFiles(directory), ['sample-2.in'])
 })
 
 test('問題が未公開なら取得を再試行する', async () => {

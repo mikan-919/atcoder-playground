@@ -13,7 +13,9 @@ import {
 } from 'node:fs'
 import { join } from 'node:path'
 import {
+  fallbackTaskIds,
   hasSampleFiles,
+  isEmptySample,
   readAtCoderCookieHeader,
   readTaskCache,
   replaceSampleDirectory,
@@ -80,11 +82,11 @@ const STATUS_LABEL = {
 
 // ---------- セットアップ ----------
 
-async function fetchTaskIds() {
+async function fetchTaskIds({ announce = true } = {}) {
   const cached = readTaskCache(taskCache, contest)
   if (cached) return cached
 
-  process.stdout.write(`${contest} の問題一覧を取得中...\n`)
+  if (announce) process.stdout.write(`${contest} の問題一覧を取得中...\n`)
   const url = `https://atcoder.jp/contests/${contest}/tasks`
   const cookie = readAtCoderCookieHeader()
   let previousNotice = -1
@@ -97,13 +99,15 @@ async function fetchTaskIds() {
       if (cookie) headers.Cookie = cookie
       return fetch(url, { headers })
     },
-    onRetry: (elapsed) => {
-      const notice = Math.floor(elapsed / 5000)
-      if (notice !== previousNotice) {
-        previousNotice = notice
-        process.stdout.write(`問題公開待ち... ${Math.ceil(elapsed / 1000)}秒\n`)
-      }
-    },
+    onRetry: announce
+      ? (elapsed) => {
+          const notice = Math.floor(elapsed / 5000)
+          if (notice !== previousNotice) {
+            previousNotice = notice
+            process.stdout.write(`問題公開待ち... ${Math.ceil(elapsed / 1000)}秒\n`)
+          }
+        }
+      : undefined,
   }).catch((error) => {
     throw new Error(`${error.message} コンテストIDとAtCoderへのログインを確認してください。`)
   })
@@ -143,13 +147,17 @@ function loadSamples(testsDir) {
     .map((file) => {
       const name = file.slice(0, -3)
       const expected = join(testsDir, `${name}.out`)
+      const input = readFileSync(join(testsDir, file), 'utf8')
+      const output = existsSync(expected) ? readFileSync(expected, 'utf8') : null
+      if (isEmptySample(input, output)) return null
       return {
         name: name.replace(/^sample-/, ''),
         inputPath: join(testsDir, file),
-        input: readFileSync(join(testsDir, file), 'utf8'),
-        expected: existsSync(expected) ? readFileSync(expected, 'utf8') : null,
+        input,
+        expected: output,
       }
     })
+    .filter((sample) => sample !== null)
 }
 
 async function downloadSamples(directory, testsDir, url) {
@@ -172,8 +180,9 @@ async function downloadSamples(directory, testsDir, url) {
   }
 }
 
-async function setup() {
-  const ids = await fetchTaskIds()
+let deferredSetup = () => {}
+
+function createProblems(ids) {
   const problems = []
   for (const id of ids) {
     const letter = id.startsWith(`${contest}_`) ? id.slice(contest.length + 1) : id
@@ -185,13 +194,8 @@ async function setup() {
       mkdirSync(directory, { recursive: true })
       copyFileSync('template/main.ts', source)
     }
-    let sampleError = null
-    if (!samplesAreFrom(testsDir, url)) {
-      process.stdout.write(`${letter}: サンプル取得中...`)
-      const result = await downloadSamples(directory, testsDir, url)
-      sampleError = result.error
-      process.stdout.write(result.ok ? ' ok\n' : ` 失敗 (${result.error})\n`)
-    }
+    const samplesReady = samplesAreFrom(testsDir, url)
+    const samples = samplesReady ? loadSamples(testsDir) : []
     problems.push({
       letter,
       url,
@@ -199,11 +203,31 @@ async function setup() {
       testsDir,
       source,
       bundle: join('dist', contest, `${letter}.js`),
-      samples: samplesAreFrom(testsDir, url) ? loadSamples(testsDir) : [],
-      sampleError,
+      samples,
+      sampleError: samplesReady ? null : 'サンプル未取得',
+      sampleStatus: samplesReady ? (samples.length > 0 ? 'ready' : 'empty') : 'missing',
       status: readFileSync(source, 'utf8') === template ? 'blank' : 'pending',
       body: [],
     })
+  }
+  return problems
+}
+
+async function setup() {
+  const cached = readTaskCache(taskCache, contest)
+  const fallback = fallbackTaskIds(contest)
+  const ids = cached ?? fallback
+  if (!ids) {
+    const problems = createProblems(await fetchTaskIds())
+    deferredSetup = () => void queueMissingSamples(problems)
+    return problems
+  }
+
+  const problems = createProblems(ids)
+  deferredSetup = () => {
+    const discovery = cached ? Promise.resolve() : fetchTaskIds({ announce: false }).catch(() => null)
+    void queueMissingSamples(problems)
+    if (!cached) void discovery.then(() => queueMissingSamples(problems))
   }
   return problems
 }
@@ -255,12 +279,67 @@ const excerpt = (text, label, color, limit = 3) => {
 }
 
 const running = new Map()
+let sampleDownloadCycle = Promise.resolve()
+
+function queueMissingSamples(problems) {
+  sampleDownloadCycle = sampleDownloadCycle.then(() => downloadMissingSamples(problems)).catch(() => {})
+  return sampleDownloadCycle
+}
+
+async function downloadProblemSamples(problem) {
+  if (running.has(problem.letter)) return
+  const task = (async () => {
+    problem.sampleStatus = 'downloading'
+    problem.sampleError = null
+    problem.body = [line('サンプル取得中...', 33)]
+    render()
+
+    const result = await downloadSamples(problem.directory, problem.testsDir, problem.url)
+    problem.sampleError = result.error
+    problem.samples = result.ok ? loadSamples(problem.testsDir) : []
+    problem.sampleStatus = result.ok ? (problem.samples.length > 0 ? 'ready' : 'empty') : 'failed'
+  })()
+
+  running.set(problem.letter, task)
+  await task
+  running.delete(problem.letter)
+  if (problem.samples.length > 0) await check(problem)
+  else {
+    problem.status = readFileSync(problem.source, 'utf8') === template ? 'blank' : 'pending'
+    const noSamples = problem.sampleStatus === 'empty'
+    const downloading = problem.sampleStatus === 'downloading'
+    problem.body = [
+      line(
+        downloading ? 'サンプル取得中...' : noSamples ? '実行できるサンプルなし' : 'サンプル未取得',
+        downloading || noSamples ? 2 : 31,
+      ),
+      ...(problem.sampleError ? excerpt(problem.sampleError, '原因', 31, 3) : []),
+      line('d で再取得', 2),
+    ]
+    render()
+  }
+}
+
+async function downloadMissingSamples(problems) {
+  for (const problem of problems) {
+    if (problem.sampleStatus === 'ready' || problem.sampleStatus === 'empty') continue
+    const current = running.get(problem.letter)
+    if (current) await current
+    if (problem.sampleStatus === 'ready' || problem.sampleStatus === 'empty') continue
+    await downloadProblemSamples(problem)
+  }
+}
 
 async function check(problem) {
   if (problem.samples.length === 0) {
     problem.status = readFileSync(problem.source, 'utf8') === template ? 'blank' : 'pending'
+    const noSamples = problem.sampleStatus === 'empty'
+    const downloading = problem.sampleStatus === 'downloading'
     problem.body = [
-      line('サンプル未取得', 31),
+      line(
+        downloading ? 'サンプル取得中...' : noSamples ? '実行できるサンプルなし' : 'サンプル未取得',
+        downloading || noSamples ? 2 : 31,
+      ),
       ...(problem.sampleError ? excerpt(problem.sampleError, '原因', 31, 3) : []),
       line('d で再取得', 2),
     ]
@@ -341,28 +420,7 @@ async function check(problem) {
 }
 
 async function refreshSamples(problem) {
-  if (running.has(problem.letter)) return
-  const task = (async () => {
-    problem.status = 'running'
-    problem.body = [line('サンプル再取得中...', 33)]
-    render()
-    const result = await downloadSamples(problem.directory, problem.testsDir, problem.url)
-    problem.sampleError = result.error
-    problem.samples = result.ok ? loadSamples(problem.testsDir) : []
-    if (!result.ok) {
-      problem.status = 'pending'
-      problem.body = [
-        line('サンプル取得失敗', 31),
-        ...excerpt(result.error ?? '', '原因', 31, 3),
-        line('d で再試行', 2),
-      ]
-      return render()
-    }
-  })()
-  running.set(problem.letter, task)
-  await task
-  running.delete(problem.letter)
-  if (problem.samples.length > 0) await check(problem)
+  await downloadProblemSamples(problem)
 }
 
 // ---------- 提出 ----------
@@ -511,4 +569,5 @@ if (process.stdin.isTTY) {
 }
 
 watchFiles()
+deferredSetup()
 await checkAll()

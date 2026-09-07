@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { hasSampleFiles, replaceSampleDirectory, samplesAreFrom } from './contest-data.mjs'
+import { hasSampleFiles, replaceSampleDirectory, runnableSampleFiles, samplesAreFrom } from './contest-data.mjs'
 import { handoffSubmit } from './handoff.mjs'
 
 const [, , command, argument] = process.argv
@@ -156,8 +156,22 @@ switch (command) {
     select(problem)
     const { tests } = paths(problem)
     if (!samplesAreFrom(tests, problem.url)) downloadSamples(problem)
+    const sampleFiles = runnableSampleFiles(tests)
+    if (sampleFiles.length === 0) {
+      console.log(`${tests} に実行できるサンプルがありません。`)
+      break
+    }
     build(problem)
-    run('oj', ['test', '--command', `node ${output}`, '--directory', tests, '--display-mode', 'diff'])
+    run('oj', [
+      'test',
+      '--command',
+      `node ${output}`,
+      '--directory',
+      tests,
+      '--display-mode',
+      'diff',
+      ...sampleFiles.map((file) => join(tests, file)),
+    ])
     break
   }
   case 'run': {

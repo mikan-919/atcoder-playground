@@ -12,6 +12,11 @@ export function parseTaskIds(contest, html) {
   return [...new Set([...html.matchAll(pattern)].map((match) => match[1]))].sort()
 }
 
+export function fallbackTaskIds(contest) {
+  if (!/^abc\d+$/.test(contest)) return null
+  return [...'abcdefg'].map((letter) => `${contest}_${letter}`)
+}
+
 export async function waitForTaskIds({ contest, fetchPage, waitMs, retryMs, onRetry = () => {} }) {
   const started = Date.now()
   let lastFailure = '問題がまだ公開されていません'
@@ -94,6 +99,28 @@ export function readAtCoderCookieHeader(path = cookiePath()) {
 
 export function hasSampleFiles(directory) {
   return existsSync(directory) && readdirSync(directory).some((file) => file.endsWith('.in'))
+}
+
+function sampleFiles(directory) {
+  if (!existsSync(directory)) return []
+  return readdirSync(directory)
+    .filter((file) => file.endsWith('.in'))
+    .map((file) => {
+      const input = readFileSync(join(directory, file), 'utf8')
+      const outputPath = join(directory, `${file.slice(0, -3)}.out`)
+      const output = existsSync(outputPath) ? readFileSync(outputPath, 'utf8') : null
+      return { file, input, output }
+    })
+}
+
+export function isEmptySample(input, output) {
+  return input.trim() === '' && (output === null || output.trim() === '')
+}
+
+export function runnableSampleFiles(directory) {
+  return sampleFiles(directory)
+    .filter(({ input, output }) => !isEmptySample(input, output))
+    .map(({ file }) => file)
 }
 
 export function samplesAreFrom(directory, problemUrl) {
