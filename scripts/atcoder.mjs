@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { hasSampleFiles, replaceSampleDirectory, samplesAreFrom } from './contest-data.mjs'
 import { handoffSubmit } from './handoff.mjs'
 
 const [, , command, argument] = process.argv
@@ -8,12 +9,15 @@ const output = 'dist/Main.js'
 const currentFile = '.current-problem'
 
 function run(program, args, options = {}) {
-  const result = spawnSync(program, args, { stdio: 'inherit', ...options })
+  const { allowFailure = false, ...spawnOptions } = options
+  const result = spawnSync(program, args, { stdio: 'inherit', ...spawnOptions })
   if (result.error?.code === 'ENOENT') {
+    if (allowFailure) return result
     console.error(`エラー: ${program} が見つかりません。README のセットアップ手順を確認してください。`)
     process.exit(127)
   }
-  if (result.status !== 0) process.exit(result.status ?? 1)
+  if (result.status !== 0 && !allowFailure) process.exit(result.status ?? 1)
+  return result
 }
 
 function parseProblem(value) {
@@ -51,10 +55,6 @@ function select(problem) {
   writeFileSync(currentFile, `${problem.url}\n`)
 }
 
-function hasTests(directory) {
-  return existsSync(directory) && readdirSync(directory).some((file) => file.endsWith('.in'))
-}
-
 function ensureSource(problem) {
   const { source } = paths(problem)
   if (existsSync(source)) return false
@@ -62,6 +62,27 @@ function ensureSource(problem) {
   copyFileSync('template/main.ts', source)
   console.log(`作成: ${source}`)
   return true
+}
+
+function downloadSamples(problem) {
+  const { directory, tests } = paths(problem)
+  mkdirSync(directory, { recursive: true })
+  const temporary = mkdtempSync(join(directory, '.test-download-'))
+  let failure = null
+  try {
+    const result = run('oj', ['download', problem.url, '--directory', temporary], { allowFailure: true })
+    if (result.error?.code === 'ENOENT') failure = { status: 127, message: 'oj が見つかりません。' }
+    else if (result.status !== 0) failure = { status: result.status ?? 1, message: 'サンプル取得に失敗しました。' }
+    else if (!hasSampleFiles(temporary)) failure = { status: 1, message: 'サンプルが1件も取得されませんでした。' }
+    else replaceSampleDirectory(tests, temporary, problem.url)
+  } finally {
+    rmSync(temporary, { recursive: true, force: true })
+  }
+
+  if (failure) {
+    console.error(`${failure.message} AtCoderへのログインは bun run login で更新できます。`)
+    process.exit(failure.status)
+  }
 }
 
 function build(problem, watch = false) {
@@ -89,7 +110,7 @@ switch (command) {
     const created = ensureSource(problem)
     select(problem)
     const { tests } = paths(problem)
-    if (!hasTests(tests)) run('oj', ['download', problem.url, '--directory', tests])
+    if (!samplesAreFrom(tests, problem.url)) downloadSamples(problem)
     console.log(`${problem.contest}/${problem.task} を選択しました${created ? '' : '（既存ファイルは保持）'}。`)
     break
   }
@@ -97,7 +118,7 @@ switch (command) {
     const problem = problemFromArgument()
     ensureSource(problem)
     select(problem)
-    run('oj', ['download', problem.url, '--directory', paths(problem).tests])
+    downloadSamples(problem)
     break
   }
   case 'dev': {
@@ -105,7 +126,7 @@ switch (command) {
     ensureSource(problem)
     select(problem)
     const { source, tests } = paths(problem)
-    if (!hasTests(tests)) run('oj', ['download', problem.url, '--directory', tests])
+    if (!samplesAreFrom(tests, problem.url)) downloadSamples(problem)
     console.log(`${problem.contest}/${problem.task} を監視します。終了するには Ctrl-C を押してください。`)
     run('watchexec', [
       '--clear',
@@ -134,12 +155,7 @@ switch (command) {
     const problem = problemFromArgument()
     select(problem)
     const { tests } = paths(problem)
-    if (!hasTests(tests)) {
-      console.error(
-        `${tests} がありません。bun run download -- ${problem.contest}/${problem.task} を実行してください。`,
-      )
-      process.exit(2)
-    }
+    if (!samplesAreFrom(tests, problem.url)) downloadSamples(problem)
     build(problem)
     run('oj', ['test', '--command', `node ${output}`, '--directory', tests, '--display-mode', 'diff'])
     break

@@ -4,13 +4,23 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  mkdtempSync,
   openSync,
   readdirSync,
   readFileSync,
+  rmSync,
   watch,
-  writeFileSync,
 } from 'node:fs'
 import { join } from 'node:path'
+import {
+  hasSampleFiles,
+  readAtCoderCookieHeader,
+  readTaskCache,
+  replaceSampleDirectory,
+  samplesAreFrom,
+  waitForTaskIds,
+  writeTaskCache,
+} from './contest-data.mjs'
 import { handoffSubmit } from './handoff.mjs'
 
 const contest = process.argv[2]
@@ -24,6 +34,8 @@ const taskCache = join(contestDir, '.tasks.json')
 const template = readFileSync('template/main.ts', 'utf8')
 const MIN_PANE = 22
 const TIMEOUT_MS = 4000
+const TASK_WAIT_MS = Number(process.env.ATCODER_TASK_WAIT_SECONDS ?? 90) * 1000
+const TASK_RETRY_MS = 1000
 
 // ---------- 表示ユーティリティ ----------
 
@@ -69,16 +81,35 @@ const STATUS_LABEL = {
 // ---------- セットアップ ----------
 
 async function fetchTaskIds() {
-  if (existsSync(taskCache)) return JSON.parse(readFileSync(taskCache, 'utf8'))
+  const cached = readTaskCache(taskCache, contest)
+  if (cached) return cached
+
   process.stdout.write(`${contest} の問題一覧を取得中...\n`)
-  const response = await fetch(`https://atcoder.jp/contests/${contest}/tasks`)
-  if (!response.ok) throw new Error(`問題一覧の取得に失敗しました (HTTP ${response.status})`)
-  const html = await response.text()
-  const pattern = new RegExp(`/contests/${contest}/tasks/([a-zA-Z0-9_]+)`, 'g')
-  const ids = [...new Set([...html.matchAll(pattern)].map((match) => match[1]))].sort()
-  if (ids.length === 0) throw new Error(`${contest} の問題が見つかりませんでした`)
+  const url = `https://atcoder.jp/contests/${contest}/tasks`
+  const cookie = readAtCoderCookieHeader()
+  let previousNotice = -1
+  const ids = await waitForTaskIds({
+    contest,
+    waitMs: TASK_WAIT_MS,
+    retryMs: TASK_RETRY_MS,
+    fetchPage: async () => {
+      const headers = { 'Cache-Control': 'no-cache' }
+      if (cookie) headers.Cookie = cookie
+      return fetch(url, { headers })
+    },
+    onRetry: (elapsed) => {
+      const notice = Math.floor(elapsed / 5000)
+      if (notice !== previousNotice) {
+        previousNotice = notice
+        process.stdout.write(`問題公開待ち... ${Math.ceil(elapsed / 1000)}秒\n`)
+      }
+    },
+  }).catch((error) => {
+    throw new Error(`${error.message} コンテストIDとAtCoderへのログインを確認してください。`)
+  })
+
   mkdirSync(contestDir, { recursive: true })
-  writeFileSync(taskCache, JSON.stringify(ids))
+  writeTaskCache(taskCache, contest, ids)
   return ids
 }
 
@@ -121,6 +152,26 @@ function loadSamples(testsDir) {
     })
 }
 
+async function downloadSamples(directory, testsDir, url) {
+  const temporary = mkdtempSync(join(directory, '.test-download-'))
+  try {
+    const result = await exec('oj', ['download', url, '--directory', temporary, '--silent'])
+    if (result.status !== 0 || !hasSampleFiles(temporary)) {
+      const detail = result.output
+        .trim()
+        .split('\n')
+        .filter((row) => row.trim() !== '')
+        .at(-1)
+      return { ok: false, error: detail ?? `終了コード ${result.status}` }
+    }
+
+    replaceSampleDirectory(testsDir, temporary, url)
+    return { ok: true, error: null }
+  } finally {
+    rmSync(temporary, { recursive: true, force: true })
+  }
+}
+
 async function setup() {
   const ids = await fetchTaskIds()
   const problems = []
@@ -129,22 +180,27 @@ async function setup() {
     const directory = join(contestDir, letter)
     const source = join(directory, 'main.ts')
     const testsDir = join(directory, 'test')
+    const url = `https://atcoder.jp/contests/${contest}/tasks/${id}`
     if (!existsSync(source)) {
       mkdirSync(directory, { recursive: true })
       copyFileSync('template/main.ts', source)
     }
-    if (!existsSync(testsDir) || !readdirSync(testsDir).some((file) => file.endsWith('.in'))) {
+    let sampleError = null
+    if (!samplesAreFrom(testsDir, url)) {
       process.stdout.write(`${letter}: サンプル取得中...`)
-      const url = `https://atcoder.jp/contests/${contest}/tasks/${id}`
-      const { status, output } = await exec('oj', ['download', url, '--directory', testsDir, '--silent'])
-      process.stdout.write(status === 0 ? ' ok\n' : ` 失敗 (${output.trim().split('\n').pop() ?? status})\n`)
+      const result = await downloadSamples(directory, testsDir, url)
+      sampleError = result.error
+      process.stdout.write(result.ok ? ' ok\n' : ` 失敗 (${result.error})\n`)
     }
     problems.push({
       letter,
-      url: `https://atcoder.jp/contests/${contest}/tasks/${id}`,
+      url,
+      directory,
+      testsDir,
       source,
       bundle: join('dist', contest, `${letter}.js`),
-      samples: loadSamples(testsDir),
+      samples: samplesAreFrom(testsDir, url) ? loadSamples(testsDir) : [],
+      sampleError,
       status: readFileSync(source, 'utf8') === template ? 'blank' : 'pending',
       body: [],
     })
@@ -201,6 +257,15 @@ const excerpt = (text, label, color, limit = 3) => {
 const running = new Map()
 
 async function check(problem) {
+  if (problem.samples.length === 0) {
+    problem.status = readFileSync(problem.source, 'utf8') === template ? 'blank' : 'pending'
+    problem.body = [
+      line('サンプル未取得', 31),
+      ...(problem.sampleError ? excerpt(problem.sampleError, '原因', 31, 3) : []),
+      line('d で再取得', 2),
+    ]
+    return render()
+  }
   if (readFileSync(problem.source, 'utf8') === template) {
     problem.status = 'blank'
     problem.body = [line('未着手', 2)]
@@ -275,6 +340,31 @@ async function check(problem) {
   running.delete(problem.letter)
 }
 
+async function refreshSamples(problem) {
+  if (running.has(problem.letter)) return
+  const task = (async () => {
+    problem.status = 'running'
+    problem.body = [line('サンプル再取得中...', 33)]
+    render()
+    const result = await downloadSamples(problem.directory, problem.testsDir, problem.url)
+    problem.sampleError = result.error
+    problem.samples = result.ok ? loadSamples(problem.testsDir) : []
+    if (!result.ok) {
+      problem.status = 'pending'
+      problem.body = [
+        line('サンプル取得失敗', 31),
+        ...excerpt(result.error ?? '', '原因', 31, 3),
+        line('d で再試行', 2),
+      ]
+      return render()
+    }
+  })()
+  running.set(problem.letter, task)
+  await task
+  running.delete(problem.letter)
+  if (problem.samples.length > 0) await check(problem)
+}
+
 // ---------- 提出 ----------
 
 function submit(problem) {
@@ -345,7 +435,10 @@ function draw() {
 
   out.push('')
   out.push(
-    paint(2, `${problems.map((p) => p.letter).join('')}: 選択   s: コピーして提出ページへ   r: 全再実行   q: 終了`),
+    paint(
+      2,
+      `${problems.map((p) => p.letter).join('')}: 選択   d: サンプル再取得   s: コピーして提出ページへ   r: 全再実行   q: 終了`,
+    ),
   )
 
   process.stdout.write(`\x1b[H${out.map((row) => `${row}\x1b[K`).join('\n')}\n\x1b[J`)
@@ -396,6 +489,11 @@ if (process.stdin.isTTY) {
   process.stdin.on('data', (key) => {
     if (key === 'q' || key === '\x03') process.exit(0)
     if (key === 'r') return checkAll()
+    if (key === 'd') {
+      const target = problems[selected]
+      if (target) refreshSamples(target)
+      return
+    }
     if (key === 's') {
       const target = problems[selected]
       // 未着手・ビルド失敗・テスト実行中は bundle が無い/古いので渡さない
