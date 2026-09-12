@@ -3,14 +3,29 @@ import { readLine, readNumberLines, readNumbers } from '../../../src/stdin'
 import { put, putArray, stop } from '../../../src/stdout'
 import { range } from '../../../src/utils/utils'
 
-const [t] = readNumbers()
+let [N, S, L] = readNumbers()
+const A=readNumbers()
 
-for (const i of range(t)) {
-  const [n] = readNumbers()
-  const ab = readNumberLines(n)
-  const costSort =
-      ab.toSorted((a, b) => a[0] - b[0])
-  const diffSort =
-      ab.toSorted((a, b) => (a[0] - a[1]) - (b[0] - b[1]))
-
+let moves = 0
+let left=Math.max(S-1,-1)
+let right = Math.min(S - 1, N)
+let count = 0
+S--
+while (left > 0 || right < N - 1) {
+  let leftdiff=Math.abs((A[left]??-Infinity)-A[S])
+    let rightdiff = Math.abs((A[right]??Infinity) - A[S])
+    put(leftdiff,rightdiff)
+    if (moves <= L) {
+        if (leftdiff <= rightdiff) {
+            S=left
+            left--
+            moves+=leftdiff
+        } else {
+            S=right
+            right++
+            moves+=leftdiff
+        }
+        count++
+    } else break
 }
+put(count-1)
