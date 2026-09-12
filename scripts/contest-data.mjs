@@ -13,7 +13,6 @@ export function parseTaskIds(contest, html) {
 }
 
 export function fallbackTaskIds(contest) {
-  if (!/^abc\d+$/.test(contest)) return null
   return [...'abcdefg'].map((letter) => `${contest}_${letter}`)
 }
 

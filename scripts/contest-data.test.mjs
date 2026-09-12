@@ -26,7 +26,7 @@ test('対象コンテストの問題だけをHTMLから読む', () => {
   assert.deepEqual(parseTaskIds('abc474', html), ['abc474_a', 'abc474_b'])
 })
 
-test('問題一覧を取得できないABCはAからGを仮定する', () => {
+test('問題一覧を取得できないコンテストはAからGを仮定する', () => {
   assert.deepEqual(fallbackTaskIds('abc474'), [
     'abc474_a',
     'abc474_b',
@@ -36,7 +36,15 @@ test('問題一覧を取得できないABCはAからGを仮定する', () => {
     'abc474_f',
     'abc474_g',
   ])
-  assert.equal(fallbackTaskIds('arc200'), null)
+  assert.deepEqual(fallbackTaskIds('not-found'), [
+    'not-found_a',
+    'not-found_b',
+    'not-found_c',
+    'not-found_d',
+    'not-found_e',
+    'not-found_f',
+    'not-found_g',
+  ])
 })
 
 test('別コンテストからコピーされた旧形式キャッシュを拒否する', () => {
