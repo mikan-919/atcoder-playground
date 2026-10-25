@@ -1,6 +1,8 @@
-# AtCoder Playground
+<h1 align="center">AtCoder Playground</h1>
 
-TypeScriptで解き、問題ごとのコードを保存しながら、AtCoderのNode.js環境向け`dist/Main.js`を生成するワークスペースです。
+<p align="center">TypeScriptで解き、問題ごとのコードを保存して、AtCoder の Node.js 環境向けに `dist/Main.js` を作るワークスペース</p>
+
+<p align="center"><a href="#初回セットアップ">初回セットアップ</a> · <a href="#普段の流れ">普段の流れ</a> · <a href="#ディレクトリ構成">ディレクトリ構成</a> · <a href="#コマンド">コマンド</a></p>
 
 ## 初回セットアップ
 
